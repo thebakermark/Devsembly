@@ -1,0 +1,10 @@
+# Default owner for all changes
+* @thebakermark
+
+# Security-sensitive areas
+/.github/ @thebakermark
+/infrastructure/ @thebakermark
+/workflows/ @thebakermark
+/agents/ @thebakermark
+/scripts/ @thebakermark
+/SECURITY.md @thebakermark
