@@ -1,0 +1,19 @@
+name: documentation-sync
+version: 0.1.0
+stages:
+  - id: inventory
+    agent: documentation-verifier
+  - id: compare
+    agent: technical-writer
+    needs: [inventory]
+  - id: execute_examples
+    agent: clean-environment-tester
+    needs: [compare]
+  - id: update
+    agent: technical-writer
+    needs: [execute_examples]
+  - id: review
+    agent: independent-reviewer
+    needs: [update]
+policy:
+  documentation_commands_must_execute: true

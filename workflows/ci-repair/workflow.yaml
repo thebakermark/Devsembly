@@ -1,0 +1,20 @@
+name: ci-repair
+version: 0.1.0
+stages:
+  - id: inspect_failure
+    agent: ci-analyst
+  - id: reproduce
+    agent: coding-agent
+    needs: [inspect_failure]
+  - id: minimal_fix
+    agent: coding-agent
+    needs: [reproduce]
+  - id: rerun
+    agent: ci-agent
+    needs: [minimal_fix]
+  - id: independent_review
+    agent: reviewer
+    needs: [rerun]
+policy:
+  max_retries_per_stage: 2
+  escalate_after_failure: true

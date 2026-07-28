@@ -1,0 +1,25 @@
+name: release
+version: 0.1.0
+stages:
+  - id: readiness
+    agent: release-readiness-agent
+    checks: [required_ci, reviews, documentation, rollback_plan]
+  - id: staging
+    agent: deployment-agent
+    needs: [readiness]
+  - id: staging_validation
+    agent: qa-agent
+    needs: [staging]
+  - id: production_approval
+    agent: approval-service
+    needs: [staging_validation]
+    gate: human_required
+  - id: production
+    agent: deployment-agent
+    needs: [production_approval]
+  - id: verification
+    agent: observability-agent
+    needs: [production]
+policy:
+  production_human_approval: required
+  rollback_plan: required

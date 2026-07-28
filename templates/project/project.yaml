@@ -1,0 +1,20 @@
+name: example-product
+repository: owner/repository
+product_owner: human-required
+risk_level: medium
+environments:
+  preview: true
+  staging: true
+  production: approval-required
+agents:
+  allowed:
+    - product
+    - architecture
+    - engineering
+    - quality
+    - security
+    - documentation
+policies:
+  direct_main_push: false
+  independent_review: required
+  production_human_approval: required

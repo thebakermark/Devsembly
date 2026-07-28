@@ -1,0 +1,19 @@
+name: security-remediation
+version: 0.1.0
+stages:
+  - id: classify
+    agent: security-analyst
+  - id: threat_assessment
+    agent: threat-model-agent
+    needs: [classify]
+  - id: remediation
+    agent: security-engineer
+    needs: [threat_assessment]
+  - id: verify
+    agent: independent-security-reviewer
+    needs: [remediation]
+  - id: regression
+    agent: qa-agent
+    needs: [verify]
+policy:
+  critical_findings_block_merge: true
