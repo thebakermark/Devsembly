@@ -1,0 +1,29 @@
+#cloud-config
+package_update: true
+package_upgrade: false
+
+packages:
+  - ca-certificates
+  - curl
+
+write_files:
+  - path: /usr/local/sbin/run-devsembly-full-install
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -Eeuo pipefail
+      export DEVSEMBLY_REPO="https://github.com/thebakermark/Devsembly.git"
+      export DEVSEMBLY_REF="build/workstation-automation-v1"
+      export ADMIN_USER="mark"
+      install -d -m 0755 /var/lib/devsembly-bootstrap
+      curl -fL \
+        "https://raw.githubusercontent.com/thebakermark/Devsembly/${DEVSEMBLY_REF}/bootstrap/devsembly-full-install.sh?nocache=$(date +%s)" \
+        -o /var/lib/devsembly-bootstrap/devsembly-full-install.sh
+      chmod 0755 /var/lib/devsembly-bootstrap/devsembly-full-install.sh
+      exec /var/lib/devsembly-bootstrap/devsembly-full-install.sh
+
+runcmd:
+  - [bash, -lc, '/usr/local/sbin/run-devsembly-full-install']
+
+final_message: "Devsembly full cloud-init finished. Review /var/log/devsembly-bootstrap.log and /var/log/devsembly-workstation.log."
