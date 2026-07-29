@@ -87,14 +87,19 @@ create_service_user() {
   install -d -o "$DEVSEMBLY_USER" -g "$DEVSEMBLY_USER" -m 0750 "$DEVSEMBLY_HOME"
 }
 
+run_git_as_service_user() {
+  runuser -u "$DEVSEMBLY_USER" -- git -C "$DEVSEMBLY_HOME" "$@"
+}
+
 checkout_repository() {
   if [[ -d "$DEVSEMBLY_HOME/.git" ]]; then
-    git -C "$DEVSEMBLY_HOME" fetch --all --prune
-    git -C "$DEVSEMBLY_HOME" checkout "$DEVSEMBLY_REF"
-    git -C "$DEVSEMBLY_HOME" reset --hard "origin/$DEVSEMBLY_REF"
+    chown -R "$DEVSEMBLY_USER:$DEVSEMBLY_USER" "$DEVSEMBLY_HOME"
+    run_git_as_service_user fetch --all --prune
+    run_git_as_service_user checkout "$DEVSEMBLY_REF"
+    run_git_as_service_user reset --hard "origin/$DEVSEMBLY_REF"
   else
     rm -rf "$DEVSEMBLY_HOME"
-    git clone --branch "$DEVSEMBLY_REF" --single-branch "$DEVSEMBLY_REPO" "$DEVSEMBLY_HOME"
+    runuser -u "$DEVSEMBLY_USER" -- git clone --branch "$DEVSEMBLY_REF" --single-branch "$DEVSEMBLY_REPO" "$DEVSEMBLY_HOME"
   fi
   chown -R "$DEVSEMBLY_USER:$DEVSEMBLY_USER" "$DEVSEMBLY_HOME"
 }
