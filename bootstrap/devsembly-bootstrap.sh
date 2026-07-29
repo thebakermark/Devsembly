@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-BOOTSTRAP_VERSION="1.0.0-rc4"
+BOOTSTRAP_VERSION="1.0.0-rc5"
 DEVSEMBLY_USER="${DEVSEMBLY_USER:-devsembly}"
 DEVSEMBLY_HOME="${DEVSEMBLY_HOME:-/opt/devsembly}"
 DEVSEMBLY_REPO="${DEVSEMBLY_REPO:-https://github.com/thebakermark/Devsembly.git}"
@@ -39,10 +39,11 @@ wait_for_package_manager() {
   echo "Waiting for Ubuntu package manager to become available..."
 
   while true; do
-    set +e
-    output="$(dpkg --configure -a 2>&1)"
-    exit_code=$?
-    set -e
+    if output="$(dpkg --configure -a 2>&1)"; then
+      exit_code=0
+    else
+      exit_code=$?
+    fi
 
     if (( exit_code == 0 )); then
       [[ -n "$output" ]] && printf '%s\n' "$output"
