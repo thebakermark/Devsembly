@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+export HOME="${HOME:-/root}"
 DEVSEMBLY_USER="${DEVSEMBLY_USER:-devsembly}"
 ADMIN_USER="${ADMIN_USER:-mark}"
 DEVSEMBLY_REPO="${DEVSEMBLY_REPO:-https://github.com/thebakermark/Devsembly.git}"
