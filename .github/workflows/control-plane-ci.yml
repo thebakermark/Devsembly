@@ -1,0 +1,30 @@
+name: Control Plane CI
+
+on:
+  pull_request:
+    paths:
+      - "devsembly/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - ".github/workflows/control-plane-ci.yml"
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --extra dev
+      - run: uv run ruff check devsembly tests
+      - run: uv run mypy devsembly
+      - run: uv run pytest -q
+      - run: docker compose config
