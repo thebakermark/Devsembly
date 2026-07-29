@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+BOOTSTRAP_VERSION="1.0.0-rc1"
 DEVSEMBLY_USER="${DEVSEMBLY_USER:-devsembly}"
 DEVSEMBLY_HOME="${DEVSEMBLY_HOME:-/opt/devsembly}"
 DEVSEMBLY_REPO="${DEVSEMBLY_REPO:-https://github.com/thebakermark/Devsembly.git}"
@@ -14,8 +15,8 @@ on_error() {
   local exit_code=$?
   local line_no=${1:-unknown}
   mkdir -p "$(dirname "$STATUS_FILE")"
-  printf 'status=failed\nline=%s\nexit_code=%s\ntimestamp=%s\n' \
-    "$line_no" "$exit_code" "$(date --iso-8601=seconds)" > "$STATUS_FILE"
+  printf 'status=failed\nline=%s\nexit_code=%s\nversion=%s\ntimestamp=%s\n' \
+    "$line_no" "$exit_code" "$BOOTSTRAP_VERSION" "$(date --iso-8601=seconds)" > "$STATUS_FILE"
   echo "ERROR: Devsembly bootstrap failed near line $line_no with exit code $exit_code."
   exit "$exit_code"
 }
@@ -33,7 +34,7 @@ install_base_packages() {
   apt-get update
   apt-get install -y \
     ca-certificates curl git gnupg jq openssl rsync unzip \
-    ufw fail2ban unattended-upgrades apt-transport-https
+    openssh-server ufw fail2ban unattended-upgrades apt-transport-https
 }
 
 configure_updates() {
@@ -44,11 +45,26 @@ EOF
   systemctl enable --now unattended-upgrades
 }
 
+configure_ssh_access() {
+  systemctl enable --now ssh
+
+  if ! sshd -t; then
+    echo "OpenSSH configuration validation failed."
+    exit 1
+  fi
+
+  if ! ss -lnt | awk '{print $4}' | grep -Eq '(^|:)(22)$'; then
+    echo "OpenSSH is not listening on TCP port 22."
+    exit 1
+  fi
+}
+
 configure_firewall() {
   ufw default deny incoming
   ufw default allow outgoing
-  ufw allow OpenSSH
+  ufw allow 22/tcp comment 'OpenSSH'
   ufw --force enable
+  ufw reload
 }
 
 configure_fail2ban() {
@@ -99,7 +115,8 @@ checkout_repository() {
     run_git_as_service_user reset --hard "origin/$DEVSEMBLY_REF"
   else
     rm -rf "$DEVSEMBLY_HOME"
-    runuser -u "$DEVSEMBLY_USER" -- git clone --branch "$DEVSEMBLY_REF" --single-branch "$DEVSEMBLY_REPO" "$DEVSEMBLY_HOME"
+    runuser -u "$DEVSEMBLY_USER" -- \
+      git clone --branch "$DEVSEMBLY_REF" --single-branch "$DEVSEMBLY_REPO" "$DEVSEMBLY_HOME"
   fi
   chown -R "$DEVSEMBLY_USER:$DEVSEMBLY_USER" "$DEVSEMBLY_HOME"
 }
@@ -138,7 +155,7 @@ EOF
 start_stack_if_available() {
   local compose_file="$DEVSEMBLY_HOME/infrastructure/docker/compose.dev.yaml"
   if [[ -f "$compose_file" ]]; then
-    systemctl start devsembly.service
+    systemctl restart devsembly.service
   else
     echo "Compose file not present at $compose_file; infrastructure bootstrap completed without starting the stack."
   fi
@@ -155,15 +172,16 @@ EOF
 
 write_completion_status() {
   mkdir -p "$(dirname "$STATUS_FILE")"
-  printf 'status=complete\ntimestamp=%s\nrepository=%s\nref=%s\nhome=%s\n' \
-    "$(date --iso-8601=seconds)" "$DEVSEMBLY_REPO" "$DEVSEMBLY_REF" "$DEVSEMBLY_HOME" > "$STATUS_FILE"
+  printf 'status=complete\nversion=%s\ntimestamp=%s\nrepository=%s\nref=%s\nhome=%s\n' \
+    "$BOOTSTRAP_VERSION" "$(date --iso-8601=seconds)" "$DEVSEMBLY_REPO" "$DEVSEMBLY_REF" "$DEVSEMBLY_HOME" > "$STATUS_FILE"
 }
 
 main() {
   require_root
-  echo "Starting Devsembly Genesis bootstrap."
+  echo "Starting Devsembly Genesis bootstrap $BOOTSTRAP_VERSION."
   install_base_packages
   configure_updates
+  configure_ssh_access
   configure_firewall
   configure_fail2ban
   install_docker
