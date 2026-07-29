@@ -30,7 +30,7 @@ async def readiness() -> dict[str, str]:
     try:
         await temporal_client()
         checks["temporal"] = "ok"
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - readiness must report any dependency failure
         checks["temporal"] = f"unavailable: {type(exc).__name__}"
 
     database_url = os.getenv("DEVSEMBLY_DATABASE_URL")
@@ -39,10 +39,12 @@ async def readiness() -> dict[str, str]:
     else:
         connection: asyncpg.Connection | None = None
         try:
-            connection = await asyncpg.connect(database_url.replace("postgresql+asyncpg://", "postgresql://"))
+            connection = await asyncpg.connect(
+                database_url.replace("postgresql+asyncpg://", "postgresql://")
+            )
             await connection.execute("SELECT 1")
             checks["postgres"] = "ok"
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - readiness must report any dependency failure
             checks["postgres"] = f"unavailable: {type(exc).__name__}"
         finally:
             if connection is not None:
