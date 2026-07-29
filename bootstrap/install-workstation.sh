@@ -57,7 +57,8 @@ install_claude_code() {
 
 install_codex() {
   if ! runuser -u "$DEVSEMBLY_USER" -- bash -lc 'command -v codex >/dev/null 2>&1'; then
-    runuser -u "$DEVSEMBLY_USER" -- bash -lc 'curl -fsSL https://chatgpt.com/codex/install.sh | sh'
+    runuser -u "$DEVSEMBLY_USER" -- bash -lc \
+      'curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh'
   fi
 }
 
@@ -87,28 +88,29 @@ EOF
 }
 
 install_validation_command() {
-  cat > /usr/local/sbin/devsembly-workstation-validate <<'EOF'
+  cat > /usr/local/sbin/devsembly-workstation-validate <<EOF
 #!/usr/bin/env bash
 set -Eeuo pipefail
 failures=0
-pass(){ printf 'PASS: %s\n' "$1"; }
-fail(){ printf 'FAIL: %s\n' "$1"; failures=$((failures+1)); }
+pass(){ printf 'PASS: %s\\n' "\$1"; }
+fail(){ printf 'FAIL: %s\\n' "\$1"; failures=\$((failures+1)); }
 command -v code-server >/dev/null 2>&1 && pass 'code-server installed' || fail 'code-server missing'
-systemctl is-active --quiet code-server@devsembly && pass 'code-server active' || fail 'code-server inactive'
-ss -lnt | awk '{print $4}' | grep -q '127.0.0.1:8080$' && pass 'code-server bound locally' || fail 'code-server not bound to 127.0.0.1:8080'
-runuser -u devsembly -- bash -lc 'command -v claude >/dev/null 2>&1' && pass 'Claude Code installed' || fail 'Claude Code missing'
-runuser -u devsembly -- bash -lc 'command -v codex >/dev/null 2>&1' && pass 'Codex installed' || fail 'Codex missing'
-[[ $(stat -c '%a' /etc/devsembly/devsembly.env) == 640 ]] && pass 'secrets permissions correct' || fail 'secrets permissions incorrect'
-[[ -w /opt/devsembly ]] && pass 'repository writable' || fail 'repository not writable'
+systemctl is-active --quiet 'code-server@$DEVSEMBLY_USER' && pass 'code-server active' || fail 'code-server inactive'
+ss -lnt | awk '{print \$4}' | grep -q '$CODE_SERVER_BIND\$' && pass 'code-server bound locally' || fail 'code-server not bound to $CODE_SERVER_BIND'
+runuser -u '$DEVSEMBLY_USER' -- bash -lc 'command -v claude >/dev/null 2>&1' && pass 'Claude Code installed' || fail 'Claude Code missing'
+runuser -u '$DEVSEMBLY_USER' -- bash -lc 'command -v codex >/dev/null 2>&1' && pass 'Codex installed' || fail 'Codex missing'
+runuser -u '$DEVSEMBLY_USER' -- docker ps >/dev/null 2>&1 && pass 'Docker usable by service user' || fail 'Docker unavailable to service user'
+[[ \$(stat -c '%a' /etc/devsembly/devsembly.env) == 640 ]] && pass 'secrets permissions correct' || fail 'secrets permissions incorrect'
+runuser -u '$DEVSEMBLY_USER' -- test -w '$DEVSEMBLY_HOME' && pass 'repository writable by service user' || fail 'repository not writable by service user'
 (( failures == 0 )) || exit 1
-printf '\nAll workstation checks passed.\n'
+printf '\\nAll workstation checks passed.\\n'
 EOF
   chmod 0755 /usr/local/sbin/devsembly-workstation-validate
 }
 
 main() {
-  install_code_server
   configure_shell_path
+  install_code_server
   install_claude_code
   install_codex
   install_secrets_directory
