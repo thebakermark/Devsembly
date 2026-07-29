@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import os
+from typing import cast
 from uuid import uuid4
 
-import asyncpg
+import asyncpg  # type: ignore[import-untyped]
 from fastapi import FastAPI, HTTPException, status
 from temporalio.client import Client
 
@@ -79,6 +80,6 @@ async def get_run(workflow_id: str) -> FactoryRun:
     client = await temporal_client()
     handle = client.get_workflow_handle(workflow_id)
     try:
-        return await handle.result()
+        return cast(FactoryRun, await handle.result())
     except Exception as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
