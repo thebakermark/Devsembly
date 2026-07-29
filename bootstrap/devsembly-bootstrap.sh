@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-BOOTSTRAP_VERSION="1.0.0-rc3"
+BOOTSTRAP_VERSION="1.0.0-rc4"
 DEVSEMBLY_USER="${DEVSEMBLY_USER:-devsembly}"
 DEVSEMBLY_HOME="${DEVSEMBLY_HOME:-/opt/devsembly}"
 DEVSEMBLY_REPO="${DEVSEMBLY_REPO:-https://github.com/thebakermark/Devsembly.git}"
@@ -32,22 +32,43 @@ require_root() {
 
 wait_for_package_manager() {
   local elapsed=0
+  local retry_interval=5
+  local output
+  local exit_code
+
   echo "Waiting for Ubuntu package manager to become available..."
 
-  while pgrep -x apt-get >/dev/null 2>&1 || \
-        pgrep -x apt >/dev/null 2>&1 || \
-        pgrep -x dpkg >/dev/null 2>&1 || \
-        pgrep -x unattended-upgr >/dev/null 2>&1; do
-    if (( elapsed >= APT_LOCK_TIMEOUT )); then
-      echo "Timed out after ${APT_LOCK_TIMEOUT}s waiting for apt/dpkg processes."
-      ps -ef | grep -E '[a]pt|[d]pkg|[u]nattended' || true
-      exit 100
-    fi
-    sleep 5
-    elapsed=$((elapsed + 5))
-  done
+  while true; do
+    set +e
+    output="$(dpkg --configure -a 2>&1)"
+    exit_code=$?
+    set -e
 
-  dpkg --configure -a
+    if (( exit_code == 0 )); then
+      [[ -n "$output" ]] && printf '%s\n' "$output"
+      return 0
+    fi
+
+    if grep -qiE 'lock.*(held|locked)|unable to acquire.*lock' <<<"$output"; then
+      if (( elapsed >= APT_LOCK_TIMEOUT )); then
+        printf '%s\n' "$output"
+        echo "Timed out after ${APT_LOCK_TIMEOUT}s waiting for the dpkg lock."
+        return 100
+      fi
+
+      if (( elapsed == 0 || elapsed % 30 == 0 )); then
+        printf '%s\n' "$output"
+        echo "Package manager is busy; retrying..."
+      fi
+
+      sleep "$retry_interval"
+      elapsed=$((elapsed + retry_interval))
+      continue
+    fi
+
+    printf '%s\n' "$output"
+    return "$exit_code"
+  done
 }
 
 apt_get() {
