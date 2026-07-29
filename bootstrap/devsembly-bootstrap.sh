@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-BOOTSTRAP_VERSION="1.0.0-rc1"
+BOOTSTRAP_VERSION="1.0.0-rc2"
 DEVSEMBLY_USER="${DEVSEMBLY_USER:-devsembly}"
 DEVSEMBLY_HOME="${DEVSEMBLY_HOME:-/opt/devsembly}"
 DEVSEMBLY_REPO="${DEVSEMBLY_REPO:-https://github.com/thebakermark/Devsembly.git}"
@@ -115,6 +115,7 @@ checkout_repository() {
     run_git_as_service_user reset --hard "origin/$DEVSEMBLY_REF"
   else
     rm -rf "$DEVSEMBLY_HOME"
+    install -d -o "$DEVSEMBLY_USER" -g "$DEVSEMBLY_USER" -m 0750 "$DEVSEMBLY_HOME"
     runuser -u "$DEVSEMBLY_USER" -- \
       git clone --branch "$DEVSEMBLY_REF" --single-branch "$DEVSEMBLY_REPO" "$DEVSEMBLY_HOME"
   fi
