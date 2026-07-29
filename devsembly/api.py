@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+import asyncpg
+from fastapi import FastAPI, HTTPException, status
 from temporalio.client import Client
 
 from devsembly.contracts import FactoryRun, ProductRequest
@@ -17,9 +18,45 @@ async def temporal_client() -> Client:
     return await Client.connect(address)
 
 
+@app.get("/health/live")
+async def liveness() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/health/ready")
+async def readiness() -> dict[str, str]:
+    checks: dict[str, str] = {}
+
+    try:
+        await temporal_client()
+        checks["temporal"] = "ok"
+    except Exception as exc:
+        checks["temporal"] = f"unavailable: {type(exc).__name__}"
+
+    database_url = os.getenv("DEVSEMBLY_DATABASE_URL")
+    if not database_url:
+        checks["postgres"] = "unconfigured"
+    else:
+        connection: asyncpg.Connection | None = None
+        try:
+            connection = await asyncpg.connect(database_url.replace("postgresql+asyncpg://", "postgresql://"))
+            await connection.execute("SELECT 1")
+            checks["postgres"] = "ok"
+        except Exception as exc:
+            checks["postgres"] = f"unavailable: {type(exc).__name__}"
+        finally:
+            if connection is not None:
+                await connection.close()
+
+    if any(value != "ok" for value in checks.values()):
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=checks)
+
+    return {"status": "ready", **checks}
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return await readiness()
 
 
 @app.post("/runs", response_model=dict[str, str], status_code=202)
