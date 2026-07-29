@@ -4,7 +4,6 @@ import asyncio
 from datetime import timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from uuid import UUID
 
 from temporalio import activity, workflow
 
