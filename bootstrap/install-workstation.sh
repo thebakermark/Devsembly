@@ -58,15 +58,15 @@ EOF
 }
 
 install_claude_code() {
-  if ! as_service_user bash -lc 'command -v claude >/dev/null 2>&1'; then
-    as_service_user bash -lc 'curl -fsSL https://claude.ai/install.sh | bash'
+  if ! as_service_user bash -lc 'cd "$HOME" && command -v claude >/dev/null 2>&1'; then
+    as_service_user bash -lc 'cd "$HOME" && curl -fsSL https://claude.ai/install.sh | bash'
   fi
 }
 
 install_codex() {
-  if ! as_service_user bash -lc 'command -v codex >/dev/null 2>&1'; then
+  if ! as_service_user bash -lc 'cd "$HOME" && command -v codex >/dev/null 2>&1'; then
     as_service_user bash -lc \
-      'curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh'
+      'cd "$HOME" && curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh'
   fi
 }
 
@@ -105,9 +105,9 @@ fail(){ printf 'FAIL: %s\\n' "\$1"; failures=\$((failures+1)); }
 command -v code-server >/dev/null 2>&1 && pass 'code-server installed' || fail 'code-server missing'
 systemctl is-active --quiet 'code-server@$DEVSEMBLY_USER' && pass 'code-server active' || fail 'code-server inactive'
 ss -lnt | awk '{print \$4}' | grep -q '$CODE_SERVER_BIND\$' && pass 'code-server bound locally' || fail 'code-server not bound to $CODE_SERVER_BIND'
-runuser -u '$DEVSEMBLY_USER' -- env HOME='$DEVSEMBLY_USER_HOME' USER='$DEVSEMBLY_USER' LOGNAME='$DEVSEMBLY_USER' bash -lc 'command -v claude >/dev/null 2>&1' && pass 'Claude Code installed' || fail 'Claude Code missing'
-runuser -u '$DEVSEMBLY_USER' -- env HOME='$DEVSEMBLY_USER_HOME' USER='$DEVSEMBLY_USER' LOGNAME='$DEVSEMBLY_USER' bash -lc 'command -v codex >/dev/null 2>&1' && pass 'Codex installed' || fail 'Codex missing'
-runuser -u '$DEVSEMBLY_USER' -- env HOME='$DEVSEMBLY_USER_HOME' docker ps >/dev/null 2>&1 && pass 'Docker usable by service user' || fail 'Docker unavailable to service user'
+runuser -u '$DEVSEMBLY_USER' -- env HOME='$DEVSEMBLY_USER_HOME' USER='$DEVSEMBLY_USER' LOGNAME='$DEVSEMBLY_USER' bash -lc 'cd "\$HOME" && command -v claude >/dev/null 2>&1' && pass 'Claude Code installed' || fail 'Claude Code missing'
+runuser -u '$DEVSEMBLY_USER' -- env HOME='$DEVSEMBLY_USER_HOME' USER='$DEVSEMBLY_USER' LOGNAME='$DEVSEMBLY_USER' bash -lc 'cd "\$HOME" && command -v codex >/dev/null 2>&1' && pass 'Codex installed' || fail 'Codex missing'
+runuser -u '$DEVSEMBLY_USER' -- env HOME='$DEVSEMBLY_USER_HOME' sh -c 'cd "\$HOME" && docker ps >/dev/null 2>&1' && pass 'Docker usable by service user' || fail 'Docker unavailable to service user'
 [[ \$(stat -c '%a' /etc/devsembly/devsembly.env) == 640 ]] && pass 'secrets permissions correct' || fail 'secrets permissions incorrect'
 runuser -u '$DEVSEMBLY_USER' -- test -w '$DEVSEMBLY_HOME' && pass 'repository writable by service user' || fail 'repository not writable by service user'
 (( failures == 0 )) || exit 1
