@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-BOOTSTRAP_VERSION="1.0.0-rc2"
+BOOTSTRAP_VERSION="1.0.0-rc3"
 DEVSEMBLY_USER="${DEVSEMBLY_USER:-devsembly}"
 DEVSEMBLY_HOME="${DEVSEMBLY_HOME:-/opt/devsembly}"
 DEVSEMBLY_REPO="${DEVSEMBLY_REPO:-https://github.com/thebakermark/Devsembly.git}"
 DEVSEMBLY_REF="${DEVSEMBLY_REF:-main}"
 LOG_FILE="${LOG_FILE:-/var/log/devsembly-bootstrap.log}"
 STATUS_FILE="${STATUS_FILE:-/var/lib/devsembly/bootstrap-status}"
+APT_LOCK_TIMEOUT="${APT_LOCK_TIMEOUT:-900}"
 
 exec > >(tee -a "$LOG_FILE") 2>&1
 
@@ -29,10 +30,38 @@ require_root() {
   fi
 }
 
+wait_for_package_manager() {
+  local elapsed=0
+  echo "Waiting for Ubuntu package manager to become available..."
+
+  while pgrep -x apt-get >/dev/null 2>&1 || \
+        pgrep -x apt >/dev/null 2>&1 || \
+        pgrep -x dpkg >/dev/null 2>&1 || \
+        pgrep -x unattended-upgr >/dev/null 2>&1; do
+    if (( elapsed >= APT_LOCK_TIMEOUT )); then
+      echo "Timed out after ${APT_LOCK_TIMEOUT}s waiting for apt/dpkg processes."
+      ps -ef | grep -E '[a]pt|[d]pkg|[u]nattended' || true
+      exit 100
+    fi
+    sleep 5
+    elapsed=$((elapsed + 5))
+  done
+
+  dpkg --configure -a
+}
+
+apt_get() {
+  wait_for_package_manager
+  apt-get \
+    -o DPkg::Lock::Timeout="$APT_LOCK_TIMEOUT" \
+    -o APT::Get::Lock-Timeout="$APT_LOCK_TIMEOUT" \
+    "$@"
+}
+
 install_base_packages() {
   export DEBIAN_FRONTEND=noninteractive
-  apt-get update
-  apt-get install -y \
+  apt_get update
+  apt_get install -y \
     ca-certificates curl git gnupg jq openssl rsync unzip \
     openssh-server ufw fail2ban unattended-upgrades apt-transport-https
 }
@@ -90,8 +119,8 @@ install_docker() {
 deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable
 EOF
 
-  apt-get update
-  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  apt_get update
+  apt_get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   systemctl enable --now docker
 }
 
