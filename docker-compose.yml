@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: devsembly
+      POSTGRES_PASSWORD: devsembly
+      POSTGRES_DB: devsembly
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devsembly"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  temporal:
+    image: temporalio/auto-setup:1.27.2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: devsembly
+      POSTGRES_PWD: devsembly
+      POSTGRES_SEEDS: postgres
+
+  temporal-ui:
+    image: temporalio/ui:2.40.1
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    ports:
+      - "8088:8080"
+
+  api:
+    build: .
+    command: uvicorn devsembly.api:app --host 0.0.0.0 --port 8000
+    depends_on:
+      - temporal
+    environment:
+      DEVSEMBLY_TEMPORAL_ADDRESS: temporal:7233
+      DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://devsembly:devsembly@postgres:5432/devsembly
+    ports:
+      - "8000:8000"
+
+  worker:
+    build: .
+    command: python -m devsembly.worker
+    depends_on:
+      - temporal
+    environment:
+      DEVSEMBLY_TEMPORAL_ADDRESS: temporal:7233
+      DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://devsembly:devsembly@postgres:5432/devsembly
+
+volumes:
+  postgres-data:
