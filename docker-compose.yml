@@ -1,58 +1,94 @@
 services:
   postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: devsembly
-      POSTGRES_PASSWORD: devsembly
-      POSTGRES_DB: devsembly
+      POSTGRES_USER: ${POSTGRES_USER:-devsembly}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-devsembly}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U devsembly"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devsembly} -d ${POSTGRES_DB:-devsembly}"]
       interval: 5s
       timeout: 5s
       retries: 20
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    networks:
+      - control-plane
 
   temporal:
     image: temporalio/auto-setup:1.27.2
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       DB: postgres12
       DB_PORT: 5432
-      POSTGRES_USER: devsembly
-      POSTGRES_PWD: devsembly
+      POSTGRES_USER: ${POSTGRES_USER:-devsembly}
+      POSTGRES_PWD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_SEEDS: postgres
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      - control-plane
 
   temporal-ui:
     image: temporalio/ui:2.40.1
+    restart: unless-stopped
     depends_on:
-      - temporal
+      temporal:
+        condition: service_healthy
     environment:
       TEMPORAL_ADDRESS: temporal:7233
     ports:
-      - "8088:8080"
+      - "127.0.0.1:${TEMPORAL_UI_PORT:-8088}:8080"
+    networks:
+      - control-plane
 
   api:
     build: .
+    restart: unless-stopped
     command: uvicorn devsembly.api:app --host 0.0.0.0 --port 8000
     depends_on:
-      - temporal
+      temporal:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
       DEVSEMBLY_TEMPORAL_ADDRESS: temporal:7233
-      DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://devsembly:devsembly@postgres:5432/devsembly
+      DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-devsembly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-devsembly}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${DEVSEMBLY_API_PORT:-8000}:8000"
+    networks:
+      - control-plane
 
   worker:
     build: .
+    restart: unless-stopped
     command: python -m devsembly.worker
     depends_on:
-      - temporal
+      temporal:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
       DEVSEMBLY_TEMPORAL_ADDRESS: temporal:7233
-      DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://devsembly:devsembly@postgres:5432/devsembly
+      DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-devsembly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-devsembly}
+    networks:
+      - control-plane
 
 volumes:
   postgres-data:
+
+networks:
+  control-plane:
+    driver: bridge
