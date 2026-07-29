@@ -66,7 +66,7 @@ if [[ -d "$DEVSEMBLY_HOME/.git" ]]; then
   runuser -u "$DEVSEMBLY_USER" -- git -C "$DEVSEMBLY_HOME" fetch \
     origin "+refs/heads/$DEVSEMBLY_REF:refs/remotes/origin/$DEVSEMBLY_REF"
   runuser -u "$DEVSEMBLY_USER" -- git -C "$DEVSEMBLY_HOME" checkout \
-    -B "$DEVSEMBLY_REF" "origin/$DEVSEMBLY_REF"
+    -f -B "$DEVSEMBLY_REF" "origin/$DEVSEMBLY_REF"
 else
   DEVSEMBLY_REF="$DEVSEMBLY_REF" DEVSEMBLY_HOME="$DEVSEMBLY_HOME" \
     bash <(curl -fsSL "https://raw.githubusercontent.com/thebakermark/Devsembly/$DEVSEMBLY_REF/bootstrap/devsembly-bootstrap.sh")
