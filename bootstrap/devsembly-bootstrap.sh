@@ -99,6 +99,11 @@ checkout_repository() {
   chown -R "$DEVSEMBLY_USER:$DEVSEMBLY_USER" "$DEVSEMBLY_HOME"
 }
 
+normalize_repository_permissions() {
+  find "$DEVSEMBLY_HOME/bootstrap" -maxdepth 1 -type f -name '*.sh' -exec chmod 0755 {} +
+  chown -R "$DEVSEMBLY_USER:$DEVSEMBLY_USER" "$DEVSEMBLY_HOME/bootstrap"
+}
+
 install_systemd_unit() {
   cat >/etc/systemd/system/devsembly.service <<EOF
 [Unit]
@@ -138,7 +143,7 @@ install_validation_command() {
   cat >/usr/local/sbin/devsembly-validate <<EOF
 #!/usr/bin/env bash
 set -Eeuo pipefail
-exec "$DEVSEMBLY_HOME/bootstrap/validate-bootstrap.sh"
+exec /usr/bin/env bash "$DEVSEMBLY_HOME/bootstrap/validate-bootstrap.sh"
 EOF
   chmod 0755 /usr/local/sbin/devsembly-validate
 }
@@ -159,6 +164,7 @@ main() {
   install_docker
   create_service_user
   checkout_repository
+  normalize_repository_permissions
   install_systemd_unit
   install_validation_command
   start_stack_if_available
