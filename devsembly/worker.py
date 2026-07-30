@@ -9,9 +9,8 @@ from temporalio.worker import Worker
 from devsembly.factory import (
     FactoryWorkflow,
     create_task_packet,
-    execute_mock_builder,
+    execute_autonomous_run,
     independent_review,
-    validate_run,
 )
 
 
@@ -23,12 +22,7 @@ async def main() -> None:
         client,
         task_queue="devsembly-factory",
         workflows=[FactoryWorkflow],
-        activities=[
-            create_task_packet,
-            execute_mock_builder,
-            validate_run,
-            independent_review,
-        ],
+        activities=[create_task_packet, execute_autonomous_run, independent_review],
     )
     await worker.run()
 
