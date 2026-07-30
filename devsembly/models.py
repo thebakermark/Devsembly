@@ -255,8 +255,8 @@ class WorkflowStepAttempt(Base):
     )
     attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False)
-    result_payload: Mapped[dict[str, object] | None] = mapped_column(JSONB)
-    error_payload: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+    result_payload: Mapped[dict[str, object] | None] = mapped_column(JSONB(none_as_null=True))
+    error_payload: Mapped[dict[str, object] | None] = mapped_column(JSONB(none_as_null=True))
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(

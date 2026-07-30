@@ -58,3 +58,9 @@ def test_workflow_idempotency_and_attempt_numbers_are_unique() -> None:
         constraint.name == "uq_workflow_step_attempts_step_number"
         for constraint in attempt_constraints
     )
+
+
+def test_workflow_attempt_optional_payloads_store_sql_null() -> None:
+    table = Base.metadata.tables["workflow_step_attempts"]
+    assert table.c.result_payload.type.none_as_null is True
+    assert table.c.error_payload.type.none_as_null is True

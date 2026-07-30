@@ -226,12 +226,12 @@ def upgrade() -> None:
         sa.Column("status", sa.String(length=40), nullable=False),
         sa.Column(
             "result_payload",
-            postgresql.JSONB(astext_type=sa.Text()),
+            postgresql.JSONB(astext_type=sa.Text(), none_as_null=True),
             nullable=True,
         ),
         sa.Column(
             "error_payload",
-            postgresql.JSONB(astext_type=sa.Text()),
+            postgresql.JSONB(astext_type=sa.Text(), none_as_null=True),
             nullable=True,
         ),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=False),
