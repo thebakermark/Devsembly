@@ -111,6 +111,7 @@ async def _seed_committed_run(
                 updated_at=now,
             )
         )
+        await session.flush()
         session.add(
             models.Initiative(
                 id=initiative_id,
@@ -123,6 +124,7 @@ async def _seed_committed_run(
                 updated_at=now,
             )
         )
+        await session.flush()
         session.add(
             models.Project(
                 id=project_id,
@@ -134,6 +136,7 @@ async def _seed_committed_run(
                 updated_at=now,
             )
         )
+        await session.flush()
         session.add(
             models.WorkflowRun(
                 id=workflow_run_id,
@@ -147,6 +150,7 @@ async def _seed_committed_run(
                 updated_at=now,
             )
         )
+        await session.flush()
         session.add(
             models.WorkflowStep(
                 id=uuid.uuid4(),
