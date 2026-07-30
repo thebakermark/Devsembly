@@ -25,6 +25,11 @@ validation. Status describes documentation completion, not runtime implementatio
 | Provider contracts | [Provider SDK](provider-sdk/README.md) | Contract specifications and examples | Schema and conformance checks |
 | Current versus future scope | [Book II](book-2-architecture.md) | [Genesis plan](../implementation/genesis-reference-implementation-plan.md) | Architecture review |
 | `$50/month` constraint | [Book I](book-1-constitution.md) | Genesis plan and operations manual | Budget acceptance test, planned |
+| Organization registry runtime | [Book VI](book-6-organizational-genome.md) | [Registry API v1](api-reference.md) | API and PostgreSQL integration tests |
+| Repository and Unit of Work runtime | [Book III](book-3-engineering-standards.md) | [ADR 0004](../architecture/decisions/0004-postgresql-persistence-contracts.md) | Transaction, rollback, and concurrency tests |
+| Initiative and project isolation | [ADR 0007](../architecture/decisions/0007-organizations-before-applications.md) | [Registry API v1](api-reference.md) | Parent-path isolation tests |
+| Monthly budget profile | Genesis plan | [Registry API v1](api-reference.md) | Decimal, uniqueness, mode, and migration constraints |
+| Transactional event writes | [ADR 0004](../architecture/decisions/0004-postgresql-persistence-contracts.md) | [Event bus](kernel/event-bus.md) | Atomic outbox integration test |
 
 ## Maintenance
 

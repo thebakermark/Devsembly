@@ -4,10 +4,17 @@ on:
   pull_request:
     paths:
       - "devsembly/**"
+      - "alembic/**"
+      - "alembic.ini"
       - "tests/**"
       - "scripts/**"
+      - "docs/**"
+      - "wiki/**"
+      - "**/*.md"
+      - ".markdownlint-cli2.jsonc"
       - ".env.example"
       - "pyproject.toml"
+      - "uv.lock"
       - "Dockerfile"
       - "docker-compose.yml"
       - ".github/workflows/control-plane-ci.yml"
@@ -21,19 +28,57 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: devsembly
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: devsembly
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U devsembly -d devsembly"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     env:
       POSTGRES_PASSWORD: ci-only-password
       MINIO_ROOT_PASSWORD: ci-only-password
+      DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://devsembly:ci-only-password@localhost:5432/devsembly
+      DEVSEMBLY_TEST_DATABASE_URL: postgresql+asyncpg://devsembly:ci-only-password@localhost:5432/devsembly
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
-      - run: uv sync --extra dev
-      - run: uv run ruff check devsembly tests
+      - run: uv sync --locked --extra dev
+      - run: uv run ruff check devsembly tests scripts/*.py
+      - run: uv run ruff format --check devsembly tests scripts/*.py
       - run: uv run mypy devsembly
+      - name: Validate Markdown
+        run: |
+          npx --yes markdownlint-cli2@0.19.0 '**/*.md'
+          python3 scripts/check_markdown_links.py
+      - name: Upgrade database
+        run: uv run alembic upgrade head
       - run: uv run pytest -q
+      - name: Validate migration round trip and model parity
+        run: |
+          test "$(uv run alembic heads | wc -l)" -eq 1
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+          uv run alembic check
       - run: docker compose config --quiet
+      - name: Build and health-check Docker stack
+        run: |
+          set -Eeuo pipefail
+          trap 'docker compose logs --no-color' ERR
+          trap 'docker compose down --volumes --remove-orphans' EXIT
+          docker compose build
+          docker compose up -d --wait --wait-timeout 240
+          curl --fail --silent --show-error http://127.0.0.1:8000/health/ready
+          docker compose ps
       - name: Validate shell syntax
         run: |
           bash -n scripts/devsembly-status.sh

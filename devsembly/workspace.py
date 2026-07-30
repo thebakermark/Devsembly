@@ -70,6 +70,8 @@ async def changed_paths(root: Path) -> list[str]:
 
 
 def enforce_allowed_paths(paths: list[str], allowed_paths: list[str]) -> None:
-    disallowed = [path for path in paths if not any(path.startswith(prefix) for prefix in allowed_paths)]
+    disallowed = [
+        path for path in paths if not any(path.startswith(prefix) for prefix in allowed_paths)
+    ]
     if disallowed:
         raise PermissionError(f"Provider changed paths outside the task boundary: {disallowed}")

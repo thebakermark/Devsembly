@@ -24,3 +24,15 @@ def test_budget_uses_fixed_precision_money() -> None:
     column = Base.metadata.tables["budgets"].c.monthly_limit
     assert column.type.precision == 12
     assert column.type.scale == 2
+
+
+def test_mutable_genesis_aggregates_use_optimistic_versions() -> None:
+    for table_name in ("organizations", "initiatives", "projects", "budgets"):
+        column = Base.metadata.tables[table_name].c.version
+        assert column.nullable is False
+        assert str(column.server_default.arg) == "1"
+
+
+def test_one_budget_is_allowed_per_project() -> None:
+    constraints = Base.metadata.tables["budgets"].constraints
+    assert any(constraint.name == "uq_budgets_project_id" for constraint in constraints)

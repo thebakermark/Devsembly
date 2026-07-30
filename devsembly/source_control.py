@@ -72,5 +72,7 @@ class GitHubCliSourceControlProvider:
         )
         stdout, stderr = await process.communicate()
         if process.returncode != 0:
-            raise RuntimeError(f"Draft change request failed: {stderr.decode(errors='replace')[-4000:]}")
+            raise RuntimeError(
+                f"Draft change request failed: {stderr.decode(errors='replace')[-4000:]}"
+            )
         return stdout.decode(errors="replace").strip()

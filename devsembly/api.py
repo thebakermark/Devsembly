@@ -4,14 +4,62 @@ import os
 from typing import cast
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from temporalio.client import Client
 
 from devsembly.contracts import FactoryRun, ProductRequest
 from devsembly.database import check_database
+from devsembly.errors import (
+    DuplicateResourceError,
+    ResourceNotFoundError,
+    StaleVersionError,
+)
 from devsembly.factory import FactoryWorkflow
+from devsembly.genesis_api import router as genesis_router
 
 app = FastAPI(title="Devsembly Factory API", version="0.1.0")
+app.include_router(genesis_router)
+
+
+@app.exception_handler(ResourceNotFoundError)
+async def resource_not_found(request: Request, exc: ResourceNotFoundError) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={
+            "code": "resource_not_found",
+            "detail": str(exc),
+            "resource": exc.resource,
+        },
+    )
+
+
+@app.exception_handler(DuplicateResourceError)
+async def duplicate_resource(request: Request, exc: DuplicateResourceError) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={
+            "code": "duplicate_resource",
+            "detail": str(exc),
+            "resource": exc.resource,
+        },
+    )
+
+
+@app.exception_handler(StaleVersionError)
+async def stale_version(request: Request, exc: StaleVersionError) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={
+            "code": "stale_version",
+            "detail": str(exc),
+            "resource": exc.resource,
+            "expected_version": exc.expected_version,
+        },
+    )
 
 
 async def temporal_client() -> Client:

@@ -38,12 +38,17 @@ The first runnable scaffold now provides:
 - SQLAlchemy 2.x asynchronous database engine and session contract;
 - Alembic configuration and an initial Genesis schema migration;
 - organization, initiative, project, budget, decision, workflow-run, audit-event, and transactional-outbox tables;
+- repository protocols, SQLAlchemy repository adapters, and an explicit asynchronous Unit of Work;
+- versioned organization, initiative, project, and budget APIs with parent-path isolation;
+- optimistic concurrency, database-enforced budget invariants, and atomic outbox writes;
 - PostgreSQL-backed readiness checking;
 - local PostgreSQL, Redis, MinIO, Temporal, API, worker, and migration services through Docker Compose;
-- schema metadata tests;
+- API, domain, schema, transaction, isolation, migration, and PostgreSQL integration tests;
 - local-development and migration instructions.
 
-This proves the selected runtime and persistence decisions. It does not yet complete the Genesis business workflow.
+This proves the selected runtime and the first organization-to-budget persistence path. It
+does not yet complete the governed workflow, identity, forecasting, evidence, or operator
+capabilities.
 
 ## 4. Mandatory capabilities
 
@@ -141,10 +146,12 @@ Genesis v0.1 is complete when:
 
 ### G1 — Domain foundation
 
-- Runtime and local data-service scaffold
-- Organization, initiative, project, budget, decision, workflow-run, audit, and outbox schema
-- Database migrations
-- Unit and integration tests
+- Runtime and local data-service scaffold — current
+- Organization, initiative, project, budget, decision, workflow-run, audit, and outbox schema — current
+- Repository, Unit of Work, organization, initiative, project, budget, and outbox-write path — current
+- Database migrations and round-trip validation — current
+- API, unit, and PostgreSQL integration tests for the registry slice — current
+- Decision, workflow-run, audit, authorization, and expanded budget behavior — remaining
 
 ### G2 — Governed workflow skeleton
 
@@ -197,13 +204,20 @@ Prefer direct, testable interfaces and reversible decisions.
 
 ## 11. Next implementation backlog
 
-1. Add repository and unit-of-work implementations over the SQLAlchemy session contract.
-2. Add organization, initiative, project, and budget application services and APIs.
-3. Persist workflow-run creation before Temporal execution.
-4. Add cost estimates, budget evaluation, and decision-record APIs.
-5. Add OIDC authentication and organization-scoped authorization.
-6. Add evidence metadata and MinIO provider adapter.
-7. Add audit/outbox writers and publisher worker.
-8. Add PostgreSQL and Temporal integration tests.
-9. Add the first end-to-end `$50/month` acceptance scenario.
-10. Add CI jobs for migrations, linting, typing, unit tests, and Compose validation.
+Completed in the issue #21 slice:
+
+1. Repository and Unit of Work implementations over the SQLAlchemy session contract.
+2. Organization, initiative, project, and monthly-budget services and APIs.
+3. Atomic transactional-outbox writes for registry mutations.
+4. PostgreSQL integration, migration round-trip, OpenAPI, isolation, and concurrency tests.
+5. CI gates for migrations, linting, typing, tests, Compose, image builds, and stack health.
+
+Next:
+
+1. Persist workflow-run creation before Temporal execution.
+2. Add cost estimates, budget evaluation, recommendation, and decision-record APIs.
+3. Add OIDC authentication and organization-scoped authorization.
+4. Add evidence metadata and a MinIO provider adapter.
+5. Add audit writers and an idempotent outbox publisher worker.
+6. Add Temporal integration and restart-recovery tests.
+7. Add the first end-to-end `$50/month` acceptance scenario.

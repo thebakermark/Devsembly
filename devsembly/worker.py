@@ -15,9 +15,7 @@ from devsembly.factory import (
 
 
 async def main() -> None:
-    client = await Client.connect(
-        os.getenv("DEVSEMBLY_TEMPORAL_ADDRESS", "localhost:7233")
-    )
+    client = await Client.connect(os.getenv("DEVSEMBLY_TEMPORAL_ADDRESS", "localhost:7233"))
     worker = Worker(
         client,
         task_queue="devsembly-factory",

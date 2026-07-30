@@ -57,6 +57,7 @@ an accepted ADR and implementation evidence say otherwise.
 | [Schemas](schemas/README.md) | Machine-readable contract schemas |
 | [Ontologies](ontologies/README.md) | Canonical concepts and relationships |
 | [Reference models](reference-models/README.md) | Nonbinding examples and current-state mappings |
+| [Registry API v1](api-reference.md) | Current organization, initiative, project, and budget HTTP contract |
 | [Capability catalog](capability-catalog.md) | Capability ownership, maturity, and provider boundaries |
 | [Traceability matrix](traceability-matrix.md) | Requirements-to-decision-to-evidence mapping |
 | [Glossary](glossary.md) | Canonical terms |
@@ -77,4 +78,5 @@ an accepted ADR and implementation evidence say otherwise.
 
 | Version | Date | Change |
 |---|---|---|
+| 0.1.1 | 2026-07-30 | Added the current Genesis Registry API and persistence evidence |
 | 0.1.0 | 2026-07-30 | Initial coherent Genesis Library |
