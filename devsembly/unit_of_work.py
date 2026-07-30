@@ -10,6 +10,7 @@ from devsembly.repositories import (
     BudgetRepository,
     CostEvaluationRepository,
     DecisionRepository,
+    EvidenceRepository,
     InitiativeRepository,
     OrganizationRepository,
     OutboxRepository,
@@ -22,6 +23,7 @@ from devsembly.sqlalchemy_repositories import (
     SqlAlchemyBudgetRepository,
     SqlAlchemyCostEvaluationRepository,
     SqlAlchemyDecisionRepository,
+    SqlAlchemyEvidenceRepository,
     SqlAlchemyInitiativeRepository,
     SqlAlchemyOrganizationRepository,
     SqlAlchemyOutboxRepository,
@@ -62,6 +64,9 @@ class UnitOfWork(Protocol):
 
     @property
     def outbox(self) -> OutboxRepository: ...
+
+    @property
+    def evidence(self) -> EvidenceRepository: ...
 
     async def __aenter__(self) -> Self: ...
 
@@ -130,6 +135,10 @@ class SqlAlchemyUnitOfWork:
     @property
     def outbox(self) -> OutboxRepository:
         return SqlAlchemyOutboxRepository(self._active_session())
+
+    @property
+    def evidence(self) -> EvidenceRepository:
+        return SqlAlchemyEvidenceRepository(self._active_session())
 
     async def __aenter__(self) -> Self:
         if self._session is not None:

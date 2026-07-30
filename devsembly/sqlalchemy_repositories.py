@@ -23,6 +23,8 @@ from devsembly.domain import (
     Decision,
     DecisionRisk,
     DecisionStatus,
+    Evidence,
+    EvidenceKind,
     Initiative,
     InitiativeStatus,
     Organization,
@@ -248,6 +250,22 @@ def _workflow_step_attempt(model: models.WorkflowStepAttempt) -> WorkflowStepAtt
         error_payload=model.error_payload,
         started_at=model.started_at,
         completed_at=model.completed_at,
+        created_at=model.created_at,
+    )
+
+
+def _evidence(model: models.Evidence) -> Evidence:
+    return Evidence(
+        id=model.id,
+        project_id=model.project_id,
+        workflow_run_id=model.workflow_run_id,
+        workflow_step_attempt_id=model.workflow_step_attempt_id,
+        kind=EvidenceKind(model.kind),
+        name=model.name,
+        content_type=model.content_type,
+        object_key=model.object_key,
+        sha256=model.sha256,
+        size_bytes=model.size_bytes,
         created_at=model.created_at,
     )
 
@@ -917,3 +935,43 @@ class SqlAlchemyOutboxRepository:
         )
         await self._session.flush()
         return message
+
+
+class SqlAlchemyEvidenceRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, evidence: Evidence) -> Evidence:
+        self._session.add(
+            models.Evidence(
+                id=evidence.id,
+                project_id=evidence.project_id,
+                workflow_run_id=evidence.workflow_run_id,
+                workflow_step_attempt_id=evidence.workflow_step_attempt_id,
+                kind=evidence.kind.value,
+                name=evidence.name,
+                content_type=evidence.content_type,
+                object_key=evidence.object_key,
+                sha256=evidence.sha256,
+                size_bytes=evidence.size_bytes,
+                created_at=evidence.created_at,
+            )
+        )
+        await self._session.flush()
+        return evidence
+
+    async def get(self, project_id: uuid.UUID, evidence_id: uuid.UUID) -> Evidence | None:
+        result = await self._session.scalar(
+            select(models.Evidence).where(
+                models.Evidence.id == evidence_id, models.Evidence.project_id == project_id
+            )
+        )
+        return None if result is None else _evidence(result)
+
+    async def list(self, project_id: uuid.UUID) -> Sequence[Evidence]:
+        result = await self._session.scalars(
+            select(models.Evidence)
+            .where(models.Evidence.project_id == project_id)
+            .order_by(models.Evidence.created_at, models.Evidence.id)
+        )
+        return [_evidence(item) for item in result]

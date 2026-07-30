@@ -10,6 +10,7 @@ from devsembly.domain import (
     Budget,
     CostEvaluation,
     Decision,
+    Evidence,
     Initiative,
     Organization,
     OutboxMessage,
@@ -182,3 +183,9 @@ class WorkflowStepAttemptRepository(Protocol):
 
 class OutboxRepository(Protocol):
     async def add(self, message: OutboxMessage) -> OutboxMessage: ...
+
+
+class EvidenceRepository(Protocol):
+    async def add(self, evidence: Evidence) -> Evidence: ...
+    async def get(self, project_id: uuid.UUID, evidence_id: uuid.UUID) -> Evidence | None: ...
+    async def list(self, project_id: uuid.UUID) -> Sequence[Evidence]: ...

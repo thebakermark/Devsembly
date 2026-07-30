@@ -532,6 +532,45 @@ class AuditEvent(Base):
     payload: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict, nullable=False)
 
 
+class Evidence(Base):
+    __tablename__ = "evidence"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('validation', 'source_control', 'workflow', 'other')", name="ck_evidence_kind"
+        ),
+        CheckConstraint("char_length(btrim(name)) > 0", name="ck_evidence_name"),
+        CheckConstraint("char_length(btrim(content_type)) > 0", name="ck_evidence_content_type"),
+        CheckConstraint(
+            "object_key ~ '^[A-Za-z0-9][A-Za-z0-9._/-]*$'", name="ck_evidence_object_key"
+        ),
+        CheckConstraint("sha256 ~ '^[0-9a-f]{64}$'", name="ck_evidence_sha256"),
+        CheckConstraint("size_bytes >= 0", name="ck_evidence_size_bytes"),
+        UniqueConstraint("project_id", "object_key", name="uq_evidence_project_object_key"),
+        Index("ix_evidence_project_created", "project_id", "created_at"),
+        Index("ix_evidence_workflow_run_id", "workflow_run_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    workflow_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workflow_runs.id", ondelete="SET NULL")
+    )
+    workflow_step_attempt_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workflow_step_attempts.id", ondelete="SET NULL")
+    )
+    kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    name: Mapped[str] = mapped_column(String(250), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(200), nullable=False)
+    object_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class OutboxEvent(Base):
     __tablename__ = "outbox_events"
 

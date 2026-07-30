@@ -79,6 +79,13 @@ class WorkflowAttemptStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class EvidenceKind(StrEnum):
+    VALIDATION = "validation"
+    SOURCE_CONTROL = "source_control"
+    WORKFLOW = "workflow"
+    OTHER = "other"
+
+
 @dataclass(frozen=True, slots=True)
 class Organization:
     id: uuid.UUID
@@ -251,6 +258,21 @@ class WorkflowStepAttempt:
     error_payload: dict[str, object] | None
     started_at: datetime
     completed_at: datetime
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class Evidence:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    workflow_run_id: uuid.UUID | None
+    workflow_step_attempt_id: uuid.UUID | None
+    kind: EvidenceKind
+    name: str
+    content_type: str
+    object_key: str
+    sha256: str
+    size_bytes: int
     created_at: datetime
 
 
