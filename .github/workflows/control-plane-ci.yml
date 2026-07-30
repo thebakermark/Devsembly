@@ -33,4 +33,7 @@ jobs:
       - run: uv run mypy devsembly
       - run: uv run pytest -q
       - run: docker compose config --quiet
-      - run: bash -n scripts/devsembly-status.sh
+      - name: Validate shell syntax
+        run: |
+          bash -n scripts/devsembly-status.sh
+          bash -n scripts/providers/claude-code.sh
