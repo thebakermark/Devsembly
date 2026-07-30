@@ -19,6 +19,16 @@ CompanyOS is the first flagship product intended to be developed with Devsembly,
 - Least-privilege credentials and complete audit logging
 - Repeated failures escalate instead of looping indefinitely
 
+## Supported platform
+
+Devsembly currently requires a **Development Host** running a supported Ubuntu LTS release. Ubuntu is the only host operating system currently built, tested, and supported by the project.
+
+A Development Host may run on any compatible infrastructure provider. Vultr is the first documented and tested provider, but provider-specific assumptions should remain outside the core application and installer wherever practical.
+
+Most Devsembly application services run in Docker containers. Host operating-system differences primarily affect provisioning, package installation, Docker setup, users and permissions, firewall configuration, service management, and first-boot automation.
+
+See [`docs/platform-support.md`](docs/platform-support.md) for the support policy and terminology.
+
 ## Platform components
 
 | Component | Responsibility |
@@ -61,11 +71,12 @@ This repository currently contains the product foundation, workflow specificatio
 
 ## Getting started
 
-1. Read [`docs/vision/product-vision.md`](docs/vision/product-vision.md).
-2. Review [`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md).
-3. Review [`docs/security/trust-model.md`](docs/security/trust-model.md).
-4. Start with the roadmap in [`docs/vision/roadmap.md`](docs/vision/roadmap.md).
-5. Use the issue templates to propose work.
+1. Review the supported-host requirements in [`docs/platform-support.md`](docs/platform-support.md).
+2. Read [`docs/vision/product-vision.md`](docs/vision/product-vision.md).
+3. Review [`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md).
+4. Review [`docs/security/trust-model.md`](docs/security/trust-model.md).
+5. Start with the roadmap in [`docs/vision/roadmap.md`](docs/vision/roadmap.md).
+6. Use the issue templates to propose work.
 
 ## License
 
@@ -73,4 +84,6 @@ No open-source license has been selected yet. Until one is added, all rights are
 
 ## Wiki and operating documentation
 
-A full version-controlled wiki source is included under [`wiki/`](wiki/). It covers VM creation, browser access, GitHub, OpenClaw, Archon, Coolify, agent workflows, security, backups, monitoring, daily operations, releases, and troubleshooting. The files are ready to publish to the repository's GitHub Wiki after the new repository is created.
+A full version-controlled wiki source is included under [`wiki/`](wiki/). It covers Development Host provisioning, browser access, GitHub, OpenClaw, Archon, Coolify, agent workflows, security, backups, monitoring, daily operations, releases, and troubleshooting.
+
+Provider-specific instructions belong in dedicated provider guides. Shared documentation should refer to the Development Host rather than a particular cloud vendor or VM product unless the provider detail is technically necessary.
