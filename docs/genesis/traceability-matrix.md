@@ -38,6 +38,7 @@ validation. Status describes documentation completion, not runtime implementatio
 | Budget enforcement modes | [Book IV](book-4-operations-manual.md) | [Cost Governance API v1](cost-governance-api.md) | Observe, warn, block, and budget-revision tests |
 | Lower-cost recommendation | Genesis plan | [Cost Governance API v1](cost-governance-api.md) | Deterministic compliant-option selection tests |
 | Material decision history | [ADR 0013](../architecture/decisions/0013-human-authority-final.md) | [Cost Governance API v1](cost-governance-api.md) | Proposal, resolution, concurrency, and finality tests |
+| Human identity and tenant authorization | [ADR 0003](../architecture/decisions/0003-oidc-external-identity.md) | [Identity and Authorization API](identity-authorization-api.md) | Token, role, delegation, isolation, audit, and PostgreSQL tests |
 
 ## Maintenance
 

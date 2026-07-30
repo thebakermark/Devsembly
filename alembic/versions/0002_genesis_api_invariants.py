@@ -5,6 +5,7 @@ Revises: 0001_genesis
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "0002_genesis_api"
@@ -30,9 +31,7 @@ def upgrade() -> None:
         "initiatives",
         "status IN ('proposed', 'active', 'paused', 'completed', 'cancelled')",
     )
-    op.create_check_constraint(
-        "ck_initiatives_name", "initiatives", "char_length(btrim(name)) > 0"
-    )
+    op.create_check_constraint("ck_initiatives_name", "initiatives", "char_length(btrim(name)) > 0")
     op.create_check_constraint(
         "ck_initiatives_objective",
         "initiatives",
@@ -48,15 +47,11 @@ def upgrade() -> None:
         "projects",
         "status IN ('planned', 'active', 'blocked', 'completed', 'cancelled')",
     )
-    op.create_check_constraint(
-        "ck_projects_name", "projects", "char_length(btrim(name)) > 0"
-    )
+    op.create_check_constraint("ck_projects_name", "projects", "char_length(btrim(name)) > 0")
     op.create_check_constraint("ck_projects_version", "projects", "version > 0")
     op.create_index("ix_projects_initiative_id", "projects", ["initiative_id"], unique=False)
 
-    op.create_check_constraint(
-        "ck_budgets_monthly_limit_positive", "budgets", "monthly_limit > 0"
-    )
+    op.create_check_constraint("ck_budgets_monthly_limit_positive", "budgets", "monthly_limit > 0")
     op.create_check_constraint(
         "ck_budgets_currency",
         "budgets",

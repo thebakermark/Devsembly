@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, status
 
+from devsembly.auth import authorize_request, internal_control_authorized
 from devsembly.domain import (
     WorkflowRunDetail,
     WorkflowRunStatus,
@@ -26,10 +27,15 @@ from devsembly.workflow_schemas import (
 )
 from devsembly.workflow_service import WorkflowService
 
-router = APIRouter(prefix="/api/v1/organizations", tags=["Genesis workflow runs"])
+router = APIRouter(
+    prefix="/api/v1/organizations",
+    tags=["Genesis workflow runs"],
+    dependencies=[Depends(authorize_request)],
+)
 internal_router = APIRouter(
     prefix="/api/v1/internal/organizations",
     tags=["Genesis workflow control"],
+    dependencies=[Depends(internal_control_authorized)],
 )
 
 PROJECT_RUNS_PATH = (

@@ -12,7 +12,7 @@ does not change capability ownership or imply support without conformance eviden
 | Initiative and project registry | Portfolio domain | Current | Organization-scoped FastAPI and PostgreSQL module |
 | Budget policy and forecasting | Budget domain | Current foundation | Monthly limit and enforcement profile; forecasting planned |
 | Decision and audit records | Governance domain | Planned | PostgreSQL plus evidence references |
-| Identity | Identity and policy | Planned | External OIDC adapter |
+| Identity | Identity and policy | Current | OIDC bearer verification and internal policy |
 | Authorization and delegation | Identity and policy | Planned | Internal policy records |
 | Workflow orchestration | Workflow capability | Current scaffold | Temporal adapter |
 | Capability registry | Kernel | Proposed | Static configuration during Genesis |

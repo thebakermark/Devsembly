@@ -89,6 +89,6 @@ preserves final decision records.
 ## Current security boundary
 
 Parent-path validation and repository scoping enforce object isolation. Authentication,
-organization membership, role evaluation, and delegated authority are not yet
-implemented. Until the OIDC and authorization slice lands, this API MUST NOT be exposed
-as a production multi-tenant service.
+organization membership, role evaluation, and delegated authority are defined in the
+[Identity and Authorization API](identity-authorization-api.md). Protected APIs MUST use
+this boundary before exposure as a production multi-tenant service.

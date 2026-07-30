@@ -5,8 +5,9 @@ Revises: 0003_workflow_runs
 """
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "0004_cost_governance"
 down_revision = "0003_workflow_runs"

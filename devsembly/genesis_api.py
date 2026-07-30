@@ -5,6 +5,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
+from devsembly.auth import (
+    AuthorizedPrincipal,
+    IdentityManagerDependency,
+    authorize_request,
+)
 from devsembly.genesis_schemas import (
     BudgetCreate,
     BudgetRead,
@@ -22,7 +27,11 @@ from devsembly.genesis_schemas import (
 from devsembly.genesis_service import GenesisService
 from devsembly.unit_of_work import SqlAlchemyUnitOfWork
 
-router = APIRouter(prefix="/api/v1/organizations", tags=["Genesis"])
+router = APIRouter(
+    prefix="/api/v1/organizations",
+    tags=["Genesis"],
+    dependencies=[Depends(authorize_request)],
+)
 
 
 def get_genesis_service() -> GenesisService:
@@ -33,15 +42,26 @@ Service = Annotated[GenesisService, Depends(get_genesis_service)]
 
 
 @router.post("", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
-async def create_organization(payload: OrganizationCreate, service: Service) -> OrganizationRead:
+async def create_organization(
+    payload: OrganizationCreate,
+    service: Service,
+    principal: AuthorizedPrincipal,
+    identities: IdentityManagerDependency,
+) -> OrganizationRead:
     organization = await service.create_organization(payload.name)
+    await identities.bootstrap_organization_owner(organization.id, principal)
     return OrganizationRead.model_validate(organization)
 
 
 @router.get("", response_model=list[OrganizationRead])
-async def list_organizations(service: Service) -> list[OrganizationRead]:
+async def list_organizations(
+    service: Service,
+    principal: AuthorizedPrincipal,
+    identities: IdentityManagerDependency,
+) -> list[OrganizationRead]:
     organizations = await service.list_organizations()
-    return [OrganizationRead.model_validate(item) for item in organizations]
+    allowed = await identities.authorized_organization_ids(principal)
+    return [OrganizationRead.model_validate(item) for item in organizations if item.id in allowed]
 
 
 @router.get("/{organization_id}", response_model=OrganizationRead)

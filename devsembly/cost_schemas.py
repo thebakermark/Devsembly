@@ -196,11 +196,6 @@ class DecisionCreate(BaseModel):
 class DecisionResolveRequest(BaseModel):
     expected_version: ExpectedVersion
     status: DecisionResolution
-    decided_by: Annotated[
-        str,
-        BeforeValidator(_strip),
-        Field(min_length=1, max_length=255),
-    ]
     decision_note: LongText
     outcome: LongText
 

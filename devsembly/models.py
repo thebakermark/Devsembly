@@ -46,6 +46,95 @@ class Organization(Timestamped, Base):
     )
 
 
+class Principal(Timestamped, Base):
+    __tablename__ = "principals"
+    __table_args__ = (
+        CheckConstraint("kind = 'human'", name="ck_principals_kind"),
+        CheckConstraint("char_length(btrim(display_name)) > 0", name="ck_principals_display_name"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    kind: Mapped[str] = mapped_column(
+        String(20), default="human", server_default=text("'human'"), nullable=False
+    )
+    display_name: Mapped[str] = mapped_column(String(200), nullable=False)
+
+
+class ExternalIdentity(Timestamped, Base):
+    __tablename__ = "external_identities"
+    __table_args__ = (
+        CheckConstraint("char_length(btrim(issuer)) > 0", name="ck_external_identities_issuer"),
+        CheckConstraint("char_length(btrim(subject)) > 0", name="ck_external_identities_subject"),
+        UniqueConstraint("issuer", "subject", name="uq_external_identities_issuer_subject"),
+        Index("ix_external_identities_principal_id", "principal_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    principal_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("principals.id", ondelete="CASCADE"), nullable=False
+    )
+    issuer: Mapped[str] = mapped_column(String(500), nullable=False)
+    subject: Mapped[str] = mapped_column(String(500), nullable=False)
+
+
+class OrganizationMembership(Timestamped, Base):
+    __tablename__ = "organization_memberships"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('owner', 'administrator', 'operator', 'approver', 'viewer')",
+            name="ck_organization_memberships_role",
+        ),
+        CheckConstraint(
+            "status IN ('active', 'suspended', 'revoked')",
+            name="ck_organization_memberships_status",
+        ),
+        UniqueConstraint(
+            "organization_id", "principal_id", name="uq_organization_memberships_org_principal"
+        ),
+        Index("ix_organization_memberships_principal_status", "principal_id", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    principal_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("principals.id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(String(30), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", server_default=text("'active'"), nullable=False
+    )
+
+
+class AuthorizationDelegation(Timestamped, Base):
+    __tablename__ = "authorization_delegations"
+    __table_args__ = (
+        CheckConstraint("char_length(btrim(action)) > 0", name="ck_delegations_action"),
+        CheckConstraint("expires_at > starts_at", name="ck_delegations_time_order"),
+        Index("ix_delegations_recipient_active", "recipient_principal_id", "revoked_at"),
+        Index("ix_delegations_organization_id", "organization_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    grantor_principal_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("principals.id", ondelete="RESTRICT"), nullable=False
+    )
+    recipient_principal_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("principals.id", ondelete="CASCADE"), nullable=False
+    )
+    action: Mapped[str] = mapped_column(String(80), nullable=False)
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE")
+    )
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Initiative(Timestamped, Base):
     __tablename__ = "initiatives"
     __table_args__ = (

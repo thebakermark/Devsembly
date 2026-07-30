@@ -163,7 +163,9 @@ Genesis v0.1 is complete when:
   and workflow persistence — current
 - Cost evaluation, deterministic budget recommendations, decision finality, and
   transactional events — current
-- Audit, authenticated authorization, actual usage, and adaptive forecasting — remaining
+- OIDC authentication, organization membership, roles, delegations, and authorization —
+  current
+- Complete audit writers, actual usage, and adaptive forecasting — remaining
 
 ### G2 — Governed workflow skeleton
 
@@ -248,10 +250,9 @@ Completed in the issue #23 slice:
 
 Next:
 
-1. Add OIDC authentication and organization-scoped authorization.
-2. Add evidence metadata and a MinIO provider adapter.
-3. Add audit writers and an idempotent outbox publisher worker.
-4. Dispatch committed workflow runs to Temporal and add restart-recovery tests.
-5. Connect workflow admission to cost evaluation and decision state.
-6. Add actual usage ingestion, adaptive forecasting, and the first complete
+1. Add evidence metadata and a MinIO provider adapter.
+2. Add complete audit writers and an idempotent outbox publisher worker.
+3. Dispatch committed workflow runs to Temporal and add restart-recovery tests.
+4. Connect workflow admission to cost evaluation and decision state.
+5. Add actual usage ingestion, adaptive forecasting, and the first complete
    end-to-end `$50/month` acceptance scenario.

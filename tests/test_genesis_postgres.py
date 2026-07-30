@@ -55,8 +55,8 @@ async def postgres_factory() -> async_sessionmaker[AsyncSession]:
             text(
                 "TRUNCATE outbox_events, audit_events, workflow_step_attempts, "
                 "workflow_steps, workflow_runs, decisions, cost_evaluations, "
-                "budgets, projects, "
-                "initiatives, organizations CASCADE"
+                "authorization_delegations, organization_memberships, external_identities, "
+                "principals, budgets, projects, initiatives, organizations CASCADE"
             )
         )
     try:

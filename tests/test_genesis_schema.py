@@ -5,6 +5,10 @@ from devsembly.database import Base
 def test_genesis_tables_are_registered() -> None:
     assert {
         "organizations",
+        "principals",
+        "external_identities",
+        "organization_memberships",
+        "authorization_delegations",
         "initiatives",
         "projects",
         "budgets",
@@ -16,6 +20,19 @@ def test_genesis_tables_are_registered() -> None:
         "audit_events",
         "outbox_events",
     }.issubset(Base.metadata.tables)
+
+
+def test_identity_keys_and_membership_scope_are_unique() -> None:
+    external_constraints = Base.metadata.tables["external_identities"].constraints
+    membership_constraints = Base.metadata.tables["organization_memberships"].constraints
+    assert any(
+        constraint.name == "uq_external_identities_issuer_subject"
+        for constraint in external_constraints
+    )
+    assert any(
+        constraint.name == "uq_organization_memberships_org_principal"
+        for constraint in membership_constraints
+    )
 
 
 def test_workflow_id_is_unique() -> None:

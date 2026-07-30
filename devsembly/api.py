@@ -19,6 +19,8 @@ from devsembly.errors import (
     StaleVersionError,
 )
 from devsembly.genesis_api import router as genesis_router
+from devsembly.identity_api import organization_router as identity_organization_router
+from devsembly.identity_api import router as identity_router
 from devsembly.workflow_api import internal_router as workflow_internal_router
 from devsembly.workflow_api import router as workflow_router
 
@@ -27,6 +29,8 @@ app.include_router(genesis_router)
 app.include_router(workflow_router)
 app.include_router(workflow_internal_router)
 app.include_router(cost_router)
+app.include_router(identity_router)
+app.include_router(identity_organization_router)
 
 
 @app.exception_handler(ResourceNotFoundError)

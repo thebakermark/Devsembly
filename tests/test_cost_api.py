@@ -197,6 +197,7 @@ async def test_warn_evaluation_recommendation_decision_and_idempotency() -> None
             assert approved_response.status_code == 200
             approved = approved_response.json()
             assert approved["status"] == "approved"
+            assert approved["decided_by"] == "00000000-0000-4000-8000-000000000001"
             assert approved["version"] == 2
             assert approved["authorization_budget_version"] == 1
             assert approved["authorization_monthly_limit"] == "50.0000"

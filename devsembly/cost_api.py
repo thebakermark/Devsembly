@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, status
 
+from devsembly.auth import AuthorizedPrincipal, authorize_request
 from devsembly.cost_schemas import (
     CostEvaluationCreate,
     CostEvaluationRead,
@@ -21,7 +22,11 @@ from devsembly.domain import (
 )
 from devsembly.unit_of_work import SqlAlchemyUnitOfWork
 
-router = APIRouter(prefix="/api/v1/organizations", tags=["Genesis cost governance"])
+router = APIRouter(
+    prefix="/api/v1/organizations",
+    tags=["Genesis cost governance"],
+    dependencies=[Depends(authorize_request)],
+)
 
 PROJECT_PATH = "/{organization_id}/initiatives/{initiative_id}/projects/{project_id}"
 COST_EVALUATIONS_PATH = f"{PROJECT_PATH}/cost-evaluations"
@@ -184,6 +189,7 @@ async def resolve_decision(
     decision_id: uuid.UUID,
     payload: DecisionResolveRequest,
     service: Service,
+    principal: AuthorizedPrincipal,
 ) -> DecisionRead:
     decision = await service.resolve_decision(
         organization_id,
@@ -192,7 +198,7 @@ async def resolve_decision(
         decision_id,
         payload.expected_version,
         status=DecisionStatus(payload.status.value),
-        decided_by=payload.decided_by,
+        decided_by=str(principal.principal_id),
         decision_note=payload.decision_note,
         outcome=payload.outcome,
     )
