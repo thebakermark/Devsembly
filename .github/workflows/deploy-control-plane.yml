@@ -1,0 +1,58 @@
+name: Deploy Control Plane
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "devsembly/**"
+      - "scripts/devsembly-status.sh"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "pyproject.toml"
+      - ".github/workflows/deploy-control-plane.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: devsembly-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEVSEMBLY_DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEVSEMBLY_DEPLOY_PORT }}
+          DEPLOY_KEY: ${{ secrets.DEVSEMBLY_DEPLOY_KEY }}
+        run: |
+          set -Eeuo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/devsembly
+          chmod 600 ~/.ssh/devsembly
+          ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy on server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEVSEMBLY_DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEVSEMBLY_DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEVSEMBLY_DEPLOY_USER }}
+        run: |
+          set -Eeuo pipefail
+          ssh -i ~/.ssh/devsembly -p "${DEPLOY_PORT:-22}" "$DEPLOY_USER@$DEPLOY_HOST" 'bash -se' <<'REMOTE'
+            set -Eeuo pipefail
+            ROOT_DIR="${DEVSEMBLY_ROOT:-/opt/devsembly}"
+            cd "$ROOT_DIR"
+            test -f .env
+            git fetch --prune origin
+            git checkout main
+            git reset --hard origin/main
+            docker compose config --quiet
+            docker compose up -d --build --remove-orphans
+            docker compose ps
+            bash scripts/devsembly-status.sh
+          REMOTE
