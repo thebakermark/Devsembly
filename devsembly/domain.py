@@ -29,6 +29,31 @@ class BudgetEnforcementMode(StrEnum):
     BLOCK = "block"
 
 
+class WorkflowRunStatus(StrEnum):
+    ACCEPTED = "accepted"
+    QUEUED = "queued"
+    RUNNING = "running"
+    CANCELLATION_REQUESTED = "cancellation_requested"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class WorkflowStepStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    SKIPPED = "skipped"
+
+
+class WorkflowAttemptStatus(StrEnum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 @dataclass(frozen=True, slots=True)
 class Organization:
     id: uuid.UUID
@@ -72,6 +97,69 @@ class Budget:
     version: int
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowRun:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    workflow_kind: str
+    idempotency_key: str
+    input_payload: dict[str, object]
+    status: WorkflowRunStatus
+    temporal_workflow_id: str | None
+    retry_of_run_id: uuid.UUID | None
+    cost_estimate: Decimal | None
+    version: int
+    cancellation_requested_at: datetime | None
+    started_at: datetime | None
+    completed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowStep:
+    id: uuid.UUID
+    workflow_run_id: uuid.UUID
+    key: str
+    name: str
+    position: int
+    status: WorkflowStepStatus
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowStepAttempt:
+    id: uuid.UUID
+    workflow_step_id: uuid.UUID
+    attempt_number: int
+    status: WorkflowAttemptStatus
+    result_payload: dict[str, object] | None
+    error_payload: dict[str, object] | None
+    started_at: datetime
+    completed_at: datetime
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowStepDefinition:
+    key: str
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowStepDetail:
+    step: WorkflowStep
+    attempts: tuple[WorkflowStepAttempt, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowRunDetail:
+    run: WorkflowRun
+    steps: tuple[WorkflowStepDetail, ...]
 
 
 @dataclass(frozen=True, slots=True)

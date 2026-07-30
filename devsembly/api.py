@@ -2,24 +2,28 @@ from __future__ import annotations
 
 import os
 from typing import cast
-from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from temporalio.client import Client
 
-from devsembly.contracts import FactoryRun, ProductRequest
+from devsembly.contracts import FactoryRun
 from devsembly.database import check_database
 from devsembly.errors import (
     DuplicateResourceError,
+    IdempotencyConflictError,
+    InvalidTransitionError,
     ResourceNotFoundError,
     StaleVersionError,
 )
-from devsembly.factory import FactoryWorkflow
 from devsembly.genesis_api import router as genesis_router
+from devsembly.workflow_api import internal_router as workflow_internal_router
+from devsembly.workflow_api import router as workflow_router
 
 app = FastAPI(title="Devsembly Factory API", version="0.1.0")
 app.include_router(genesis_router)
+app.include_router(workflow_router)
+app.include_router(workflow_internal_router)
 
 
 @app.exception_handler(ResourceNotFoundError)
@@ -62,6 +66,34 @@ async def stale_version(request: Request, exc: StaleVersionError) -> JSONRespons
     )
 
 
+@app.exception_handler(IdempotencyConflictError)
+async def idempotency_conflict(request: Request, exc: IdempotencyConflictError) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={
+            "code": "idempotency_conflict",
+            "detail": str(exc),
+            "idempotency_key": exc.idempotency_key,
+        },
+    )
+
+
+@app.exception_handler(InvalidTransitionError)
+async def invalid_transition(request: Request, exc: InvalidTransitionError) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={
+            "code": "invalid_transition",
+            "detail": str(exc),
+            "resource": exc.resource,
+            "current_status": exc.current_status,
+            "target_status": exc.target_status,
+        },
+    )
+
+
 async def temporal_client() -> Client:
     address = os.getenv("DEVSEMBLY_TEMPORAL_ADDRESS", "localhost:7233")
     return await Client.connect(address)
@@ -97,19 +129,6 @@ async def readiness() -> dict[str, str]:
 @app.get("/health")
 async def health() -> dict[str, str]:
     return await readiness()
-
-
-@app.post("/runs", response_model=dict[str, str], status_code=202)
-async def start_run(request: ProductRequest) -> dict[str, str]:
-    client = await temporal_client()
-    workflow_id = f"factory-{uuid4()}"
-    await client.start_workflow(
-        FactoryWorkflow.run,
-        request,
-        id=workflow_id,
-        task_queue="devsembly-factory",
-    )
-    return {"workflow_id": workflow_id, "status": "queued"}
 
 
 @app.get("/runs/{workflow_id}", response_model=FactoryRun)

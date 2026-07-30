@@ -30,6 +30,10 @@ validation. Status describes documentation completion, not runtime implementatio
 | Initiative and project isolation | [ADR 0007](../architecture/decisions/0007-organizations-before-applications.md) | [Registry API v1](api-reference.md) | Parent-path isolation tests |
 | Monthly budget profile | Genesis plan | [Registry API v1](api-reference.md) | Decimal, uniqueness, mode, and migration constraints |
 | Transactional event writes | [ADR 0004](../architecture/decisions/0004-postgresql-persistence-contracts.md) | [Event bus](kernel/event-bus.md) | Atomic outbox integration test |
+| Workflow intent before execution | [Workflow engine](kernel/workflow-engine.md) | [Workflow Run API v1](workflow-run-api.md) | Create/replay API and PostgreSQL tests |
+| Workflow lifecycle and concurrency | [Book III](book-3-engineering-standards.md) | [Workflow Run API v1](workflow-run-api.md) | Transition, stale-version, cancellation, and terminal-state tests |
+| Workflow retry lineage | [Workflow engine](kernel/workflow-engine.md) | [Workflow Run API v1](workflow-run-api.md) | Retry isolation and idempotency tests |
+| Workflow step evidence | [Book V](book-5-agent-handbook.md) | [Workflow Run API v1](workflow-run-api.md) | Attempt ordering, payload, transaction, and outbox tests |
 
 ## Maintenance
 

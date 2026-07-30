@@ -12,6 +12,9 @@ from devsembly.repositories import (
     OrganizationRepository,
     OutboxRepository,
     ProjectRepository,
+    WorkflowRunRepository,
+    WorkflowStepAttemptRepository,
+    WorkflowStepRepository,
 )
 from devsembly.sqlalchemy_repositories import (
     SqlAlchemyBudgetRepository,
@@ -19,6 +22,9 @@ from devsembly.sqlalchemy_repositories import (
     SqlAlchemyOrganizationRepository,
     SqlAlchemyOutboxRepository,
     SqlAlchemyProjectRepository,
+    SqlAlchemyWorkflowRunRepository,
+    SqlAlchemyWorkflowStepAttemptRepository,
+    SqlAlchemyWorkflowStepRepository,
 )
 
 
@@ -34,6 +40,15 @@ class UnitOfWork(Protocol):
 
     @property
     def budgets(self) -> BudgetRepository: ...
+
+    @property
+    def workflow_runs(self) -> WorkflowRunRepository: ...
+
+    @property
+    def workflow_steps(self) -> WorkflowStepRepository: ...
+
+    @property
+    def workflow_step_attempts(self) -> WorkflowStepAttemptRepository: ...
 
     @property
     def outbox(self) -> OutboxRepository: ...
@@ -81,6 +96,18 @@ class SqlAlchemyUnitOfWork:
     @property
     def budgets(self) -> BudgetRepository:
         return SqlAlchemyBudgetRepository(self._active_session())
+
+    @property
+    def workflow_runs(self) -> WorkflowRunRepository:
+        return SqlAlchemyWorkflowRunRepository(self._active_session())
+
+    @property
+    def workflow_steps(self) -> WorkflowStepRepository:
+        return SqlAlchemyWorkflowStepRepository(self._active_session())
+
+    @property
+    def workflow_step_attempts(self) -> WorkflowStepAttemptRepository:
+        return SqlAlchemyWorkflowStepAttemptRepository(self._active_session())
 
     @property
     def outbox(self) -> OutboxRepository:

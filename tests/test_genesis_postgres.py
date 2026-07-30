@@ -16,14 +16,19 @@ from devsembly.domain import (
     Organization,
     OutboxMessage,
     ProjectStatus,
+    WorkflowAttemptStatus,
+    WorkflowRunStatus,
+    WorkflowStepDefinition,
 )
 from devsembly.errors import (
     DuplicateResourceError,
+    IdempotencyConflictError,
     ResourceNotFoundError,
     StaleVersionError,
 )
 from devsembly.genesis_service import GenesisService
 from devsembly.unit_of_work import SqlAlchemyUnitOfWork
+from devsembly.workflow_service import WorkflowService
 
 TEST_DATABASE_URL = os.getenv("DEVSEMBLY_TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(
@@ -40,8 +45,9 @@ async def postgres_factory() -> async_sessionmaker[AsyncSession]:
     async with engine.begin() as connection:
         await connection.execute(
             text(
-                "TRUNCATE outbox_events, audit_events, workflow_runs, decisions, "
-                "budgets, projects, initiatives, organizations CASCADE"
+                "TRUNCATE outbox_events, audit_events, workflow_step_attempts, "
+                "workflow_steps, workflow_runs, decisions, budgets, projects, "
+                "initiatives, organizations CASCADE"
             )
         )
     try:
@@ -154,3 +160,184 @@ async def test_unit_of_work_rolls_back_domain_and_outbox_together(
         stored_event = await session.get(models.OutboxEvent, event.id)
     assert stored_organization is None
     assert stored_event is None
+
+
+async def test_workflow_repositories_persist_scope_idempotency_attempts_and_retry(
+    postgres_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    factory = lambda: SqlAlchemyUnitOfWork(postgres_factory)
+    genesis = GenesisService(factory)
+    workflows = WorkflowService(factory)
+    organization = await genesis.create_organization("Devsembly")
+    initiative = await genesis.create_initiative(
+        organization.id,
+        name="Genesis",
+        objective="Persist workflow intent.",
+        status=InitiativeStatus.ACTIVE,
+    )
+    project = await genesis.create_project(
+        organization.id,
+        initiative.id,
+        name="Control Plane",
+        repository="thebakermark/Devsembly",
+        status=ProjectStatus.ACTIVE,
+    )
+    definitions = (
+        WorkflowStepDefinition(key="build", name="Build"),
+        WorkflowStepDefinition(key="validate", name="Validate"),
+    )
+
+    created, was_created = await workflows.create_workflow_run(
+        organization.id,
+        initiative.id,
+        project.id,
+        workflow_kind="software_change",
+        idempotency_key="postgres-issue-22",
+        input_payload={"issue_number": 22},
+        steps=definitions,
+    )
+    replay, replay_created = await workflows.create_workflow_run(
+        organization.id,
+        initiative.id,
+        project.id,
+        workflow_kind="software_change",
+        idempotency_key="postgres-issue-22",
+        input_payload={"issue_number": 22},
+        steps=definitions,
+    )
+    assert was_created is True
+    assert replay_created is False
+    assert replay.run.id == created.run.id
+
+    with pytest.raises(IdempotencyConflictError):
+        await workflows.create_workflow_run(
+            organization.id,
+            initiative.id,
+            project.id,
+            workflow_kind="software_change",
+            idempotency_key="postgres-issue-22",
+            input_payload={"issue_number": 23},
+            steps=definitions,
+        )
+
+    queued = await workflows.update_workflow_run_status(
+        organization.id,
+        initiative.id,
+        project.id,
+        created.run.id,
+        1,
+        target_status=WorkflowRunStatus.QUEUED,
+        temporal_workflow_id="postgres-workflow-22",
+    )
+    conflicting_run, _ = await workflows.create_workflow_run(
+        organization.id,
+        initiative.id,
+        project.id,
+        workflow_kind="software_change",
+        idempotency_key="postgres-provider-conflict",
+        input_payload={"issue_number": 22},
+        steps=definitions,
+    )
+    with pytest.raises(DuplicateResourceError):
+        await workflows.update_workflow_run_status(
+            organization.id,
+            initiative.id,
+            project.id,
+            conflicting_run.run.id,
+            1,
+            target_status=WorkflowRunStatus.QUEUED,
+            temporal_workflow_id="postgres-workflow-22",
+        )
+    running = await workflows.update_workflow_run_status(
+        organization.id,
+        initiative.id,
+        project.id,
+        created.run.id,
+        queued.run.version,
+        target_status=WorkflowRunStatus.RUNNING,
+        temporal_workflow_id=None,
+    )
+    first_step = running.steps[0].step
+    failed_step = await workflows.record_workflow_step_attempt(
+        organization.id,
+        initiative.id,
+        project.id,
+        created.run.id,
+        first_step.id,
+        first_step.version,
+        status=WorkflowAttemptStatus.FAILED,
+        result_payload=None,
+        error_payload={"code": "build_failed"},
+        started_at=None,
+    )
+    recovered_step = await workflows.record_workflow_step_attempt(
+        organization.id,
+        initiative.id,
+        project.id,
+        created.run.id,
+        first_step.id,
+        failed_step.step.version,
+        status=WorkflowAttemptStatus.SUCCEEDED,
+        result_payload={"commit": "abc123"},
+        error_payload=None,
+        started_at=None,
+    )
+    assert [attempt.attempt_number for attempt in recovered_step.attempts] == [1, 2]
+
+    with pytest.raises(StaleVersionError):
+        await workflows.update_workflow_run_status(
+            organization.id,
+            initiative.id,
+            project.id,
+            created.run.id,
+            1,
+            target_status=WorkflowRunStatus.FAILED,
+            temporal_workflow_id=None,
+        )
+
+    failed_run = await workflows.update_workflow_run_status(
+        organization.id,
+        initiative.id,
+        project.id,
+        created.run.id,
+        running.run.version,
+        target_status=WorkflowRunStatus.FAILED,
+        temporal_workflow_id=None,
+    )
+    retry, retry_created = await workflows.retry_workflow_run(
+        organization.id,
+        initiative.id,
+        project.id,
+        created.run.id,
+        failed_run.run.version,
+        idempotency_key="postgres-issue-22-retry",
+    )
+    assert retry_created is True
+    assert retry.run.retry_of_run_id == created.run.id
+    assert len(retry.steps) == 2
+    assert all(not item.attempts for item in retry.steps)
+
+    other_organization = await genesis.create_organization("Other")
+    with pytest.raises(ResourceNotFoundError):
+        await workflows.get_workflow_run(
+            other_organization.id,
+            initiative.id,
+            project.id,
+            created.run.id,
+        )
+
+    async with postgres_factory() as session:
+        run_count = await session.scalar(select(func.count()).select_from(models.WorkflowRun))
+        step_count = await session.scalar(select(func.count()).select_from(models.WorkflowStep))
+        attempt_count = await session.scalar(
+            select(func.count()).select_from(models.WorkflowStepAttempt)
+        )
+        workflow_event_count = await session.scalar(
+            select(func.count())
+            .select_from(models.OutboxEvent)
+            .where(models.OutboxEvent.topic.like("genesis.workflow%"))
+        )
+    assert run_count == 3
+    assert step_count == 6
+    assert attempt_count == 2
+    assert workflow_event_count == 8

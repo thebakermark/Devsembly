@@ -30,6 +30,7 @@ Compose performs the following sequence:
 ## Local endpoints
 
 - API documentation: `http://127.0.0.1:8000/docs`
+- Genesis workflow contract: [`../genesis/workflow-run-api.md`](../genesis/workflow-run-api.md)
 - Liveness: `http://127.0.0.1:8000/health/live`
 - Readiness: `http://127.0.0.1:8000/health/ready`
 - Temporal UI: `http://127.0.0.1:8088`
@@ -45,6 +46,10 @@ ruff check .
 mypy devsembly
 pytest
 ```
+
+The project-scoped workflow API persists an `accepted` run before provider execution.
+The earlier direct `POST /runs` Temporal start route is intentionally unavailable. A
+later dispatcher will start only committed workflow runs.
 
 ## Migration workflow
 

@@ -2,10 +2,20 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 from decimal import Decimal
 from typing import Protocol
 
-from devsembly.domain import Budget, Initiative, Organization, OutboxMessage, Project
+from devsembly.domain import (
+    Budget,
+    Initiative,
+    Organization,
+    OutboxMessage,
+    Project,
+    WorkflowRun,
+    WorkflowStep,
+    WorkflowStepAttempt,
+)
 
 
 class OrganizationRepository(Protocol):
@@ -77,6 +87,58 @@ class BudgetRepository(Protocol):
         currency: str,
         enforcement_mode: str,
     ) -> Budget | None: ...
+
+
+class WorkflowRunRepository(Protocol):
+    async def add(self, workflow_run: WorkflowRun) -> WorkflowRun: ...
+
+    async def get(
+        self, project_id: uuid.UUID, workflow_run_id: uuid.UUID
+    ) -> WorkflowRun | None: ...
+
+    async def get_by_idempotency_key(
+        self, project_id: uuid.UUID, idempotency_key: str
+    ) -> WorkflowRun | None: ...
+
+    async def list(self, project_id: uuid.UUID) -> Sequence[WorkflowRun]: ...
+
+    async def update_status(
+        self,
+        project_id: uuid.UUID,
+        workflow_run_id: uuid.UUID,
+        expected_version: int,
+        *,
+        status: str,
+        temporal_workflow_id: str | None,
+        cancellation_requested_at: datetime | None,
+        started_at: datetime | None,
+        completed_at: datetime | None,
+    ) -> WorkflowRun | None: ...
+
+
+class WorkflowStepRepository(Protocol):
+    async def add(self, step: WorkflowStep) -> WorkflowStep: ...
+
+    async def get(
+        self, workflow_run_id: uuid.UUID, workflow_step_id: uuid.UUID
+    ) -> WorkflowStep | None: ...
+
+    async def list(self, workflow_run_id: uuid.UUID) -> Sequence[WorkflowStep]: ...
+
+    async def update_status(
+        self,
+        workflow_run_id: uuid.UUID,
+        workflow_step_id: uuid.UUID,
+        expected_version: int,
+        *,
+        status: str,
+    ) -> WorkflowStep | None: ...
+
+
+class WorkflowStepAttemptRepository(Protocol):
+    async def add(self, attempt: WorkflowStepAttempt) -> WorkflowStepAttempt: ...
+
+    async def list(self, workflow_step_id: uuid.UUID) -> Sequence[WorkflowStepAttempt]: ...
 
 
 class OutboxRepository(Protocol):

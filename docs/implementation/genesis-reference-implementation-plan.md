@@ -40,15 +40,17 @@ The first runnable scaffold now provides:
 - organization, initiative, project, budget, decision, workflow-run, audit-event, and transactional-outbox tables;
 - repository protocols, SQLAlchemy repository adapters, and an explicit asynchronous Unit of Work;
 - versioned organization, initiative, project, and budget APIs with parent-path isolation;
+- project-scoped workflow-run APIs with durable intent, lifecycle transitions, cancellation,
+  retry lineage, ordered steps, completed attempts, and idempotent creation;
 - optimistic concurrency, database-enforced budget invariants, and atomic outbox writes;
 - PostgreSQL-backed readiness checking;
 - local PostgreSQL, Redis, MinIO, Temporal, API, worker, and migration services through Docker Compose;
 - API, domain, schema, transaction, isolation, migration, and PostgreSQL integration tests;
 - local-development and migration instructions.
 
-This proves the selected runtime and the first organization-to-budget persistence path. It
-does not yet complete the governed workflow, identity, forecasting, evidence, or operator
-capabilities.
+This proves the selected runtime, organization-to-budget persistence path, and durable
+workflow intent before provider dispatch. It does not yet complete Temporal dispatch,
+identity, forecasting, evidence, audit publication, or operator capabilities.
 
 ## 4. Mandatory capabilities
 
@@ -147,15 +149,19 @@ Genesis v0.1 is complete when:
 ### G1 — Domain foundation
 
 - Runtime and local data-service scaffold — current
-- Organization, initiative, project, budget, decision, workflow-run, audit, and outbox schema — current
-- Repository, Unit of Work, organization, initiative, project, budget, and outbox-write path — current
+- Organization, initiative, project, budget, decision, workflow-run, workflow-step,
+  step-attempt, audit, and outbox schema — current
+- Repository, Unit of Work, organization, initiative, project, budget, workflow-run,
+  step-attempt, and outbox-write path — current
 - Database migrations and round-trip validation — current
-- API, unit, and PostgreSQL integration tests for the registry slice — current
-- Decision, workflow-run, audit, authorization, and expanded budget behavior — remaining
+- API, unit, and PostgreSQL integration tests for registry and workflow persistence — current
+- Decision, cost evaluation, audit, authorization, and expanded budget behavior — remaining
 
 ### G2 — Governed workflow skeleton
 
-- Durable stages, retries, approvals, and evidence
+- Durable workflow intent, ordered steps, completed attempts, cancellation, and retry
+  lineage — current
+- Temporal dispatch, durable provider execution, approval gates, and evidence — remaining
 - Mock implementation and validation agents
 - Recovery and idempotency tests
 
@@ -212,12 +218,21 @@ Completed in the issue #21 slice:
 4. PostgreSQL integration, migration round-trip, OpenAPI, isolation, and concurrency tests.
 5. CI gates for migrations, linting, typing, tests, Compose, image builds, and stack health.
 
+Completed in the issue #22 slice:
+
+1. Persisted provider-neutral workflow intent before Temporal execution.
+2. Added ordered workflow steps, immutable completed attempts, lifecycle transitions,
+   cancellation, retry lineage, and optimistic concurrency.
+3. Added exact idempotent create/retry replay and conflict handling.
+4. Removed the direct unpersisted Temporal start API.
+5. Added workflow migration, API, PostgreSQL, transition, isolation, and outbox tests.
+
 Next:
 
-1. Persist workflow-run creation before Temporal execution.
-2. Add cost estimates, budget evaluation, recommendation, and decision-record APIs.
-3. Add OIDC authentication and organization-scoped authorization.
-4. Add evidence metadata and a MinIO provider adapter.
-5. Add audit writers and an idempotent outbox publisher worker.
-6. Add Temporal integration and restart-recovery tests.
-7. Add the first end-to-end `$50/month` acceptance scenario.
+1. Add cost estimates, budget evaluation, lower-cost recommendations, and decision-record
+   APIs.
+2. Add OIDC authentication and organization-scoped authorization.
+3. Add evidence metadata and a MinIO provider adapter.
+4. Add audit writers and an idempotent outbox publisher worker.
+5. Dispatch committed workflow runs to Temporal and add restart-recovery tests.
+6. Add the first end-to-end `$50/month` acceptance scenario.

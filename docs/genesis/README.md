@@ -1,6 +1,6 @@
 # Devsembly Genesis Library
 
-**Library version:** 0.1.0
+**Library version:** 0.1.2
 **Status:** Active foundation
 **North Star:** **Engineer organizations that learn faster than the world changes.**
 
@@ -58,6 +58,7 @@ an accepted ADR and implementation evidence say otherwise.
 | [Ontologies](ontologies/README.md) | Canonical concepts and relationships |
 | [Reference models](reference-models/README.md) | Nonbinding examples and current-state mappings |
 | [Registry API v1](api-reference.md) | Current organization, initiative, project, and budget HTTP contract |
+| [Workflow Run API v1](workflow-run-api.md) | Current workflow intent, lifecycle, step, attempt, cancellation, and retry contract |
 | [Capability catalog](capability-catalog.md) | Capability ownership, maturity, and provider boundaries |
 | [Traceability matrix](traceability-matrix.md) | Requirements-to-decision-to-evidence mapping |
 | [Glossary](glossary.md) | Canonical terms |
@@ -78,5 +79,6 @@ an accepted ADR and implementation evidence say otherwise.
 
 | Version | Date | Change |
 |---|---|---|
+| 0.1.2 | 2026-07-30 | Added persisted workflow intent, lifecycle, steps, attempts, cancellation, and retry |
 | 0.1.1 | 2026-07-30 | Added the current Genesis Registry API and persistence evidence |
 | 0.1.0 | 2026-07-30 | Initial coherent Genesis Library |

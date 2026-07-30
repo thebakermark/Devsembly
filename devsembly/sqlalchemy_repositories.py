@@ -19,6 +19,12 @@ from devsembly.domain import (
     OutboxMessage,
     Project,
     ProjectStatus,
+    WorkflowAttemptStatus,
+    WorkflowRun,
+    WorkflowRunStatus,
+    WorkflowStep,
+    WorkflowStepAttempt,
+    WorkflowStepStatus,
 )
 from devsembly.errors import DuplicateResourceError, StaleVersionError
 
@@ -69,6 +75,54 @@ def _budget(model: models.Budget) -> Budget:
         version=model.version,
         created_at=model.created_at,
         updated_at=model.updated_at,
+    )
+
+
+def _workflow_run(model: models.WorkflowRun) -> WorkflowRun:
+    return WorkflowRun(
+        id=model.id,
+        project_id=model.project_id,
+        workflow_kind=model.workflow_kind,
+        idempotency_key=model.idempotency_key,
+        input_payload=model.input_payload,
+        status=WorkflowRunStatus(model.status),
+        temporal_workflow_id=model.temporal_workflow_id,
+        retry_of_run_id=model.retry_of_run_id,
+        cost_estimate=model.cost_estimate,
+        version=model.version,
+        cancellation_requested_at=model.cancellation_requested_at,
+        started_at=model.started_at,
+        completed_at=model.completed_at,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+    )
+
+
+def _workflow_step(model: models.WorkflowStep) -> WorkflowStep:
+    return WorkflowStep(
+        id=model.id,
+        workflow_run_id=model.workflow_run_id,
+        key=model.key,
+        name=model.name,
+        position=model.position,
+        status=WorkflowStepStatus(model.status),
+        version=model.version,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+    )
+
+
+def _workflow_step_attempt(model: models.WorkflowStepAttempt) -> WorkflowStepAttempt:
+    return WorkflowStepAttempt(
+        id=model.id,
+        workflow_step_id=model.workflow_step_id,
+        attempt_number=model.attempt_number,
+        status=WorkflowAttemptStatus(model.status),
+        result_payload=model.result_payload,
+        error_payload=model.error_payload,
+        started_at=model.started_at,
+        completed_at=model.completed_at,
+        created_at=model.created_at,
     )
 
 
@@ -342,6 +396,215 @@ class SqlAlchemyBudgetRepository:
         if await self.get(project_id, budget_id) is None:
             return None
         raise StaleVersionError("budget", expected_version)
+
+
+class SqlAlchemyWorkflowRunRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, workflow_run: WorkflowRun) -> WorkflowRun:
+        self._session.add(
+            models.WorkflowRun(
+                id=workflow_run.id,
+                project_id=workflow_run.project_id,
+                workflow_kind=workflow_run.workflow_kind,
+                idempotency_key=workflow_run.idempotency_key,
+                input_payload=workflow_run.input_payload,
+                status=workflow_run.status.value,
+                temporal_workflow_id=workflow_run.temporal_workflow_id,
+                retry_of_run_id=workflow_run.retry_of_run_id,
+                cost_estimate=workflow_run.cost_estimate,
+                version=workflow_run.version,
+                cancellation_requested_at=workflow_run.cancellation_requested_at,
+                started_at=workflow_run.started_at,
+                completed_at=workflow_run.completed_at,
+                created_at=workflow_run.created_at,
+                updated_at=workflow_run.updated_at,
+            )
+        )
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            raise DuplicateResourceError("workflow run") from exc
+        return workflow_run
+
+    async def get(self, project_id: uuid.UUID, workflow_run_id: uuid.UUID) -> WorkflowRun | None:
+        result = await self._session.scalars(
+            select(models.WorkflowRun).where(
+                models.WorkflowRun.id == workflow_run_id,
+                models.WorkflowRun.project_id == project_id,
+            )
+        )
+        model = result.one_or_none()
+        return None if model is None else _workflow_run(model)
+
+    async def get_by_idempotency_key(
+        self, project_id: uuid.UUID, idempotency_key: str
+    ) -> WorkflowRun | None:
+        result = await self._session.scalars(
+            select(models.WorkflowRun).where(
+                models.WorkflowRun.project_id == project_id,
+                models.WorkflowRun.idempotency_key == idempotency_key,
+            )
+        )
+        model = result.one_or_none()
+        return None if model is None else _workflow_run(model)
+
+    async def list(self, project_id: uuid.UUID) -> Sequence[WorkflowRun]:
+        result = await self._session.scalars(
+            select(models.WorkflowRun)
+            .where(models.WorkflowRun.project_id == project_id)
+            .order_by(models.WorkflowRun.created_at, models.WorkflowRun.id)
+        )
+        return [_workflow_run(model) for model in result]
+
+    async def update_status(
+        self,
+        project_id: uuid.UUID,
+        workflow_run_id: uuid.UUID,
+        expected_version: int,
+        *,
+        status: str,
+        temporal_workflow_id: str | None,
+        cancellation_requested_at: datetime | None,
+        started_at: datetime | None,
+        completed_at: datetime | None,
+    ) -> WorkflowRun | None:
+        now = datetime.now(UTC)
+        try:
+            result = await self._session.scalars(
+                update(models.WorkflowRun)
+                .where(
+                    models.WorkflowRun.id == workflow_run_id,
+                    models.WorkflowRun.project_id == project_id,
+                    models.WorkflowRun.version == expected_version,
+                )
+                .values(
+                    status=status,
+                    temporal_workflow_id=temporal_workflow_id,
+                    cancellation_requested_at=cancellation_requested_at,
+                    started_at=started_at,
+                    completed_at=completed_at,
+                    version=expected_version + 1,
+                    updated_at=now,
+                )
+                .returning(models.WorkflowRun)
+            )
+        except IntegrityError as exc:
+            raise DuplicateResourceError("Temporal workflow correlation") from exc
+        model = result.one_or_none()
+        if model is not None:
+            return _workflow_run(model)
+        if await self.get(project_id, workflow_run_id) is None:
+            return None
+        raise StaleVersionError("workflow run", expected_version)
+
+
+class SqlAlchemyWorkflowStepRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, step: WorkflowStep) -> WorkflowStep:
+        self._session.add(
+            models.WorkflowStep(
+                id=step.id,
+                workflow_run_id=step.workflow_run_id,
+                key=step.key,
+                name=step.name,
+                position=step.position,
+                status=step.status.value,
+                version=step.version,
+                created_at=step.created_at,
+                updated_at=step.updated_at,
+            )
+        )
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            raise DuplicateResourceError("workflow step") from exc
+        return step
+
+    async def get(
+        self, workflow_run_id: uuid.UUID, workflow_step_id: uuid.UUID
+    ) -> WorkflowStep | None:
+        result = await self._session.scalars(
+            select(models.WorkflowStep).where(
+                models.WorkflowStep.id == workflow_step_id,
+                models.WorkflowStep.workflow_run_id == workflow_run_id,
+            )
+        )
+        model = result.one_or_none()
+        return None if model is None else _workflow_step(model)
+
+    async def list(self, workflow_run_id: uuid.UUID) -> Sequence[WorkflowStep]:
+        result = await self._session.scalars(
+            select(models.WorkflowStep)
+            .where(models.WorkflowStep.workflow_run_id == workflow_run_id)
+            .order_by(models.WorkflowStep.position, models.WorkflowStep.id)
+        )
+        return [_workflow_step(model) for model in result]
+
+    async def update_status(
+        self,
+        workflow_run_id: uuid.UUID,
+        workflow_step_id: uuid.UUID,
+        expected_version: int,
+        *,
+        status: str,
+    ) -> WorkflowStep | None:
+        now = datetime.now(UTC)
+        result = await self._session.scalars(
+            update(models.WorkflowStep)
+            .where(
+                models.WorkflowStep.id == workflow_step_id,
+                models.WorkflowStep.workflow_run_id == workflow_run_id,
+                models.WorkflowStep.version == expected_version,
+            )
+            .values(status=status, version=expected_version + 1, updated_at=now)
+            .returning(models.WorkflowStep)
+        )
+        model = result.one_or_none()
+        if model is not None:
+            return _workflow_step(model)
+        if await self.get(workflow_run_id, workflow_step_id) is None:
+            return None
+        raise StaleVersionError("workflow step", expected_version)
+
+
+class SqlAlchemyWorkflowStepAttemptRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, attempt: WorkflowStepAttempt) -> WorkflowStepAttempt:
+        self._session.add(
+            models.WorkflowStepAttempt(
+                id=attempt.id,
+                workflow_step_id=attempt.workflow_step_id,
+                attempt_number=attempt.attempt_number,
+                status=attempt.status.value,
+                result_payload=attempt.result_payload,
+                error_payload=attempt.error_payload,
+                started_at=attempt.started_at,
+                completed_at=attempt.completed_at,
+                created_at=attempt.created_at,
+            )
+        )
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            raise DuplicateResourceError("workflow step attempt") from exc
+        return attempt
+
+    async def list(self, workflow_step_id: uuid.UUID) -> Sequence[WorkflowStepAttempt]:
+        result = await self._session.scalars(
+            select(models.WorkflowStepAttempt)
+            .where(models.WorkflowStepAttempt.workflow_step_id == workflow_step_id)
+            .order_by(
+                models.WorkflowStepAttempt.attempt_number,
+                models.WorkflowStepAttempt.id,
+            )
+        )
+        return [_workflow_step_attempt(model) for model in result]
 
 
 class SqlAlchemyOutboxRepository:

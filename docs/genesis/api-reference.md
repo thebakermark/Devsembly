@@ -77,6 +77,10 @@ Create and update operations emit `genesis.<resource>.created` or
 `genesis.<resource>.updated`. The outbox writer is current; delivery and consumer
 idempotency remain a later capability.
 
+Project-scoped workflow execution intent uses the separate
+[Workflow Run API v1](workflow-run-api.md). It reuses these transaction and isolation
+contracts before any Temporal dispatch can occur.
+
 ## Current security boundary
 
 Parent-path validation and repository scoping enforce object isolation. Authentication,
