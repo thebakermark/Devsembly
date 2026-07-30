@@ -9,16 +9,33 @@ from devsembly.contracts import TaskPacket, ValidationEvidence
 from devsembly.providers import BuildResult
 from devsembly.workspace import changed_paths, enforce_allowed_paths
 
+_ALLOWED_ENV = {
+    "ANTHROPIC_API_KEY",
+    "DEVSEMBLY_CLAUDE_MAX_TURNS",
+    "DEVSEMBLY_CLAUDE_MODEL",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "PATH",
+    "SSL_CERT_DIR",
+    "SSL_CERT_FILE",
+}
+
 
 class CommandCodingProvider:
     """Runs a configured provider command inside the isolated workspace.
 
     The command receives a JSON task packet on stdin and must edit files only inside
-    the workspace. Credentials and provider-specific setup stay outside the core.
+    the workspace. Only an explicit environment allowlist is inherited, preventing
+    source-control and infrastructure credentials from reaching the coding provider.
     """
 
     def __init__(self, command: str | None = None) -> None:
         self.command = command or os.getenv("DEVSEMBLY_CODING_PROVIDER_COMMAND", "")
+
+    @staticmethod
+    def _provider_environment() -> dict[str, str]:
+        return {name: value for name in _ALLOWED_ENV if (value := os.getenv(name)) is not None}
 
     async def _execute(
         self,
@@ -31,6 +48,7 @@ class CommandCodingProvider:
         process = await asyncio.create_subprocess_shell(
             self.command,
             cwd=workspace,
+            env=self._provider_environment(),
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
