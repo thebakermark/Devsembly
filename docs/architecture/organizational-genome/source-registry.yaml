@@ -1,0 +1,45 @@
+schema_version: 1.0.0
+sources:
+  - source_id: SRC-ONET-DATABASE
+    publisher: U.S. Department of Labor, Employment and Training Administration
+    title: O*NET Database
+    source_type: dataset
+    jurisdiction: US
+    status: discovered
+    license:
+      classification: attribution-required
+      allowed_use: pending-review
+    intended_use:
+      - occupations
+      - tasks
+      - skills
+      - knowledge
+      - work-activities
+  - source_id: SRC-OPM-CLASSIFICATION
+    publisher: U.S. Office of Personnel Management
+    title: Position Classification Standards
+    source_type: classification-standard
+    jurisdiction: US-Federal
+    status: discovered
+    license:
+      classification: government-open-data
+      allowed_use: pending-review
+    intended_use:
+      - job-series
+      - position-complexity
+      - supervisory-scope
+      - qualification-levels
+  - source_id: SRC-UK-CIVIL-SERVICE-CAPABILITY
+    publisher: UK Government
+    title: Civil Service Capability Frameworks
+    source_type: framework
+    jurisdiction: UK
+    status: discovered
+    license:
+      classification: attribution-required
+      allowed_use: pending-review
+    intended_use:
+      - job-families
+      - competency-levels
+      - career-paths
+      - leadership-expectations
