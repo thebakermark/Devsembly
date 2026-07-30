@@ -13,11 +13,13 @@ from devsembly.database import check_database
 from devsembly.errors import (
     CostGovernanceError,
     DuplicateResourceError,
+    EvidenceIntegrityError,
     IdempotencyConflictError,
     InvalidTransitionError,
     ResourceNotFoundError,
     StaleVersionError,
 )
+from devsembly.evidence_api import router as evidence_router
 from devsembly.genesis_api import router as genesis_router
 from devsembly.identity_api import organization_router as identity_organization_router
 from devsembly.identity_api import router as identity_router
@@ -31,6 +33,7 @@ app.include_router(workflow_internal_router)
 app.include_router(cost_router)
 app.include_router(identity_router)
 app.include_router(identity_organization_router)
+app.include_router(evidence_router)
 
 
 @app.exception_handler(ResourceNotFoundError)
@@ -109,6 +112,19 @@ async def cost_governance_error(request: Request, exc: CostGovernanceError) -> J
         content={
             "code": "cost_governance_error",
             "detail": str(exc),
+        },
+    )
+
+
+@app.exception_handler(EvidenceIntegrityError)
+async def evidence_integrity_error(request: Request, exc: EvidenceIntegrityError) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        content={
+            "code": "evidence_integrity_error",
+            "detail": str(exc),
+            "evidence_id": exc.evidence_id,
         },
     )
 

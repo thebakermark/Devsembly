@@ -1,6 +1,6 @@
 # Devsembly Genesis Library
 
-**Library version:** 0.1.3
+**Library version:** 0.1.4
 **Status:** Active foundation
 **North Star:** **Engineer organizations that learn faster than the world changes.**
 
@@ -60,6 +60,7 @@ an accepted ADR and implementation evidence say otherwise.
 | [Registry API v1](api-reference.md) | Current organization, initiative, project, and budget HTTP contract |
 | [Workflow Run API v1](workflow-run-api.md) | Current workflow intent, lifecycle, step, attempt, cancellation, and retry contract |
 | [Cost Governance API v1](cost-governance-api.md) | Current cost evaluation, budget recommendation, and decision-record contract |
+| [Evidence API v1](evidence-api.md) | Current immutable ingestion, authorized retrieval, integrity, and retention contract |
 | [Capability catalog](capability-catalog.md) | Capability ownership, maturity, and provider boundaries |
 | [Traceability matrix](traceability-matrix.md) | Requirements-to-decision-to-evidence mapping |
 | [Glossary](glossary.md) | Canonical terms |
@@ -80,6 +81,7 @@ an accepted ADR and implementation evidence say otherwise.
 
 | Version | Date | Change |
 |---|---|---|
+| 0.1.4 | 2026-07-30 | Added evidence ingestion, authorized retrieval, integrity verification, and retention policy |
 | 0.1.3 | 2026-07-30 | Added cost evaluation, budget recommendations, and governed decisions |
 | 0.1.2 | 2026-07-30 | Added persisted workflow intent, lifecycle, steps, attempts, cancellation, and retry |
 | 0.1.1 | 2026-07-30 | Added the current Genesis Registry API and persistence evidence |

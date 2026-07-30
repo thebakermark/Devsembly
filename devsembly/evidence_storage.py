@@ -18,6 +18,8 @@ class StoredObject:
 
 class EvidenceStorage(Protocol):
     def put(self, object_key: str, content: bytes, content_type: str) -> StoredObject: ...
+    def get(self, object_key: str) -> bytes: ...
+    def delete(self, object_key: str) -> None: ...
 
 
 class MinioEvidenceStorage:
@@ -49,3 +51,14 @@ class MinioEvidenceStorage:
             self._bucket, object_key, io.BytesIO(content), len(content), content_type=content_type
         )
         return StoredObject(object_key=object_key, sha256=digest, size_bytes=len(content))
+
+    def get(self, object_key: str) -> bytes:
+        response = self._client.get_object(self._bucket, object_key)
+        try:
+            return bytes(response.read())
+        finally:
+            response.close()
+            response.release_conn()
+
+    def delete(self, object_key: str) -> None:
+        self._client.remove_object(self._bucket, object_key)

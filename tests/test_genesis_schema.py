@@ -18,6 +18,7 @@ def test_genesis_tables_are_registered() -> None:
         "workflow_steps",
         "workflow_step_attempts",
         "audit_events",
+        "evidence",
         "outbox_events",
     }.issubset(Base.metadata.tables)
 
@@ -103,3 +104,12 @@ def test_decisions_have_final_state_and_budget_authorization_fields() -> None:
     assert table.c.authorization_budget_version.nullable is True
     assert table.c.estimated_monthly_cost.type.precision == 14
     assert table.c.estimated_monthly_cost.type.scale == 4
+
+
+def test_evidence_retention_is_server_governed() -> None:
+    table = Base.metadata.tables["evidence"]
+    assert table.c.retention_class.nullable is False
+    assert table.c.retain_until.nullable is True
+    assert any(
+        constraint.name == "ck_evidence_retention_deadline" for constraint in table.constraints
+    )

@@ -165,7 +165,8 @@ Genesis v0.1 is complete when:
   transactional events — current
 - OIDC authentication, organization membership, roles, delegations, and authorization —
   current
-- Immutable evidence metadata and the MinIO object-storage adapter — current
+- Immutable evidence ingestion, authorized retrieval, retention metadata, and the MinIO
+  object-storage adapter — current
 - Complete audit writers, actual usage, and adaptive forecasting — remaining
 
 ### G2 — Governed workflow skeleton
@@ -248,6 +249,17 @@ Completed in the issue #23 slice:
 5. Added proposed and final decision APIs with concurrency, finality, declared human
    provenance, and transactional outbox events.
 6. Added migration, OpenAPI, isolation, idempotency, PostgreSQL, and `$50/month` tests.
+
+Completed in the evidence lifecycle slice:
+
+1. Added immutable Base64 evidence ingestion with server-generated, content-addressed
+   object keys.
+2. Added organization- and project-authorized metadata and content retrieval.
+3. Added SHA-256 and size verification before content is returned.
+4. Added server-derived transient, standard, compliance, and permanent retention
+   metadata with database invariants.
+5. Added compensating object cleanup, transactional outbox records, migration, API,
+   storage, isolation, integrity, and retention tests.
 
 Next:
 

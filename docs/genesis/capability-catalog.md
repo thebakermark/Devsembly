@@ -20,7 +20,7 @@ does not change capability ownership or imply support without conformance eviden
 | Domain event delivery | Event capability | Current writer | Transactional outbox writes; publisher planned |
 | Memory and knowledge | Memory capability | Planned | Relational metadata and object evidence first |
 | Relational database | Data capability | Current scaffold | PostgreSQL and SQLAlchemy |
-| Object storage | Storage capability | Current scaffold | MinIO-compatible adapter |
+| Object storage | Storage capability | Current foundation | MinIO evidence ingestion and verified retrieval |
 | Ephemeral coordination | Cache capability | Current scaffold | Redis, never canonical |
 | Source control | Delivery capability | Current adapter | GitHub as initial provider |
 | Work tracking | Delivery capability | Planned | GitHub issues initially |

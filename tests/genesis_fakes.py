@@ -11,6 +11,7 @@ from devsembly.domain import (
     Budget,
     CostEvaluation,
     Decision,
+    Evidence,
     Initiative,
     Organization,
     OutboxMessage,
@@ -33,6 +34,7 @@ class MemoryStore:
     workflow_runs: dict[uuid.UUID, WorkflowRun] = field(default_factory=dict)
     workflow_steps: dict[uuid.UUID, WorkflowStep] = field(default_factory=dict)
     workflow_step_attempts: dict[uuid.UUID, WorkflowStepAttempt] = field(default_factory=dict)
+    evidence: dict[uuid.UUID, Evidence] = field(default_factory=dict)
     outbox: list[OutboxMessage] = field(default_factory=list)
     commits: int = 0
     rollbacks: int = 0
@@ -454,6 +456,32 @@ class MemoryOutboxRepository:
         return message
 
 
+class MemoryEvidenceRepository:
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def add(self, evidence: Evidence) -> Evidence:
+        if any(
+            item.project_id == evidence.project_id and item.object_key == evidence.object_key
+            for item in self.store.evidence.values()
+        ):
+            raise DuplicateResourceError("evidence")
+        self.store.evidence[evidence.id] = evidence
+        return evidence
+
+    async def get(self, project_id: uuid.UUID, evidence_id: uuid.UUID) -> Evidence | None:
+        evidence = self.store.evidence.get(evidence_id)
+        if evidence is None or evidence.project_id != project_id:
+            return None
+        return evidence
+
+    async def list(self, project_id: uuid.UUID) -> list[Evidence]:
+        return sorted(
+            (item for item in self.store.evidence.values() if item.project_id == project_id),
+            key=lambda item: (item.created_at, item.id),
+        )
+
+
 class MemoryUnitOfWork:
     def __init__(self, store: MemoryStore) -> None:
         self.store = store
@@ -466,6 +494,7 @@ class MemoryUnitOfWork:
         self.workflow_runs = MemoryWorkflowRunRepository(store)
         self.workflow_steps = MemoryWorkflowStepRepository(store)
         self.workflow_step_attempts = MemoryWorkflowStepAttemptRepository(store)
+        self.evidence = MemoryEvidenceRepository(store)
         self.outbox = MemoryOutboxRepository(store)
         self.committed = False
 

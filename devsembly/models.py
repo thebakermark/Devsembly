@@ -545,6 +545,16 @@ class Evidence(Base):
         ),
         CheckConstraint("sha256 ~ '^[0-9a-f]{64}$'", name="ck_evidence_sha256"),
         CheckConstraint("size_bytes >= 0", name="ck_evidence_size_bytes"),
+        CheckConstraint(
+            "retention_class IN ('transient', 'standard', 'compliance', 'permanent')",
+            name="ck_evidence_retention_class",
+        ),
+        CheckConstraint(
+            "(retention_class = 'permanent' AND retain_until IS NULL) "
+            "OR (retention_class <> 'permanent' AND retain_until IS NOT NULL "
+            "AND retain_until > created_at)",
+            name="ck_evidence_retention_deadline",
+        ),
         UniqueConstraint("project_id", "object_key", name="uq_evidence_project_object_key"),
         Index("ix_evidence_project_created", "project_id", "created_at"),
         Index("ix_evidence_workflow_run_id", "workflow_run_id"),
@@ -566,6 +576,8 @@ class Evidence(Base):
     object_key: Mapped[str] = mapped_column(String(500), nullable=False)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    retention_class: Mapped[str] = mapped_column(String(30), nullable=False)
+    retain_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

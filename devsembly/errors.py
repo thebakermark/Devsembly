@@ -48,3 +48,9 @@ class CostGovernanceError(GenesisError):
     def __init__(self, detail: str) -> None:
         self.detail = detail
         super().__init__(detail)
+
+
+class EvidenceIntegrityError(GenesisError):
+    def __init__(self, evidence_id: str) -> None:
+        self.evidence_id = evidence_id
+        super().__init__(f"stored content for evidence {evidence_id} failed integrity verification")

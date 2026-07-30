@@ -86,6 +86,13 @@ class EvidenceKind(StrEnum):
     OTHER = "other"
 
 
+class EvidenceRetentionClass(StrEnum):
+    TRANSIENT = "transient"
+    STANDARD = "standard"
+    COMPLIANCE = "compliance"
+    PERMANENT = "permanent"
+
+
 @dataclass(frozen=True, slots=True)
 class Organization:
     id: uuid.UUID
@@ -273,6 +280,8 @@ class Evidence:
     object_key: str
     sha256: str
     size_bytes: int
+    retention_class: EvidenceRetentionClass
+    retain_until: datetime | None
     created_at: datetime
 
 

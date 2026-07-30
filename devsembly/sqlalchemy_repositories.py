@@ -25,6 +25,7 @@ from devsembly.domain import (
     DecisionStatus,
     Evidence,
     EvidenceKind,
+    EvidenceRetentionClass,
     Initiative,
     InitiativeStatus,
     Organization,
@@ -266,6 +267,8 @@ def _evidence(model: models.Evidence) -> Evidence:
         object_key=model.object_key,
         sha256=model.sha256,
         size_bytes=model.size_bytes,
+        retention_class=EvidenceRetentionClass(model.retention_class),
+        retain_until=model.retain_until,
         created_at=model.created_at,
     )
 
@@ -954,6 +957,8 @@ class SqlAlchemyEvidenceRepository:
                 object_key=evidence.object_key,
                 sha256=evidence.sha256,
                 size_bytes=evidence.size_bytes,
+                retention_class=evidence.retention_class.value,
+                retain_until=evidence.retain_until,
                 created_at=evidence.created_at,
             )
         )
