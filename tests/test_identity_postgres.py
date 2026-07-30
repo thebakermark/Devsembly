@@ -46,7 +46,7 @@ async def test_oidc_memberships_delegation_and_audit_are_enforced() -> None:
         )
 
     app.dependency_overrides.clear()
-    app.dependency_overrides[get_token_verifier] = DeterministicVerifier
+    app.dependency_overrides[get_token_verifier] = lambda: DeterministicVerifier()
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             assert (await client.get("/api/v1/me")).status_code == 401
