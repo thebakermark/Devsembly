@@ -1,0 +1,63 @@
+schema_version: 1
+updated_at: "2026-07-30T18:11:00-05:00"
+repository: thebakermark/Devsembly
+branch: docs/genesis-reference-implementation-plan
+pull_request:
+  number: 17
+  state: open
+  draft: true
+  mergeable: true
+  merged: false
+current_milestone: genesis-v0.1
+completed_capabilities:
+  - organization-registry
+  - initiative-registry
+  - project-registry
+  - repository-pattern
+  - unit-of-work
+  - budget-engine
+  - cost-governance
+  - identity-and-authorization
+  - evidence-lifecycle
+  - audit-trail
+  - transactional-outbox
+  - event-publication
+  - temporal-dispatch
+  - restart-recovery
+validation:
+  latest_head: 15d2a3fa567666e29225c3e947ed0d52f38d40eb
+  latest_ci_run: 46
+  status: passed
+next_capability:
+  name: workflow-admission-and-cost-escalation
+  objectives:
+    - evaluate projected workflow cost before admission
+    - admit workflows allowed by policy and budget
+    - warn when thresholds are approached
+    - pause workflows requiring approval
+    - block workflows that violate policy or budget
+    - resume approved workflows without duplicate execution
+    - audit evaluations approvals denials and overrides
+  required_validation:
+    - ruff
+    - mypy
+    - pytest
+    - alembic
+    - docker
+    - docker-compose
+    - integration-tests
+known_blockers:
+  - current ChatGPT runtime has no local repository checkout
+  - current ChatGPT runtime has no GitHub CLI
+  - current ChatGPT runtime cannot resolve github.com for git clone
+rules:
+  keep_pull_request_draft: true
+  merge_without_explicit_approval: false
+  create_new_branch_without_instruction: false
+  source_of_truth: github
+remaining_roadmap:
+  - actual-usage-ingestion-and-adaptive-forecasting
+  - end-to-end-governed-50-dollar-monthly-scenario
+  - temporal-signals-and-persisted-step-attempts
+  - cancellation-provider-execution-and-evidence
+  - operator-control-surface
