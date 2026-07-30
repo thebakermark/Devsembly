@@ -4,11 +4,11 @@ import os
 from typing import cast
 from uuid import uuid4
 
-import asyncpg  # type: ignore[import-untyped]
 from fastapi import FastAPI, HTTPException, status
 from temporalio.client import Client
 
 from devsembly.contracts import FactoryRun, ProductRequest
+from devsembly.database import check_database
 from devsembly.factory import FactoryWorkflow
 
 app = FastAPI(title="Devsembly Factory API", version="0.1.0")
@@ -31,25 +31,14 @@ async def readiness() -> dict[str, str]:
     try:
         await temporal_client()
         checks["temporal"] = "ok"
-    except Exception as exc:  # noqa: BLE001 - readiness must report any dependency failure
+    except Exception as exc:  # noqa: BLE001 - readiness reports dependency failures
         checks["temporal"] = f"unavailable: {type(exc).__name__}"
 
-    database_url = os.getenv("DEVSEMBLY_DATABASE_URL")
-    if not database_url:
-        checks["postgres"] = "unconfigured"
-    else:
-        connection: asyncpg.Connection | None = None
-        try:
-            connection = await asyncpg.connect(
-                database_url.replace("postgresql+asyncpg://", "postgresql://")
-            )
-            await connection.execute("SELECT 1")
-            checks["postgres"] = "ok"
-        except Exception as exc:  # noqa: BLE001 - readiness must report any dependency failure
-            checks["postgres"] = f"unavailable: {type(exc).__name__}"
-        finally:
-            if connection is not None:
-                await connection.close()
+    try:
+        await check_database()
+        checks["postgres"] = "ok"
+    except Exception as exc:  # noqa: BLE001 - readiness reports dependency failures
+        checks["postgres"] = f"unavailable: {type(exc).__name__}"
 
     if any(value != "ok" for value in checks.values()):
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=checks)
