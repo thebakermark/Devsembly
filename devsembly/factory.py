@@ -40,7 +40,7 @@ async def create_task_packet(run: FactoryRun) -> FactoryRun:
 
 @activity.defn
 async def execute_mock_builder(run: FactoryRun) -> FactoryRun:
-    """Safe vertical-slice worker; replace with OpenHands/Codex provider adapter."""
+    """Safe vertical-slice worker; replace with an AI coding provider adapter."""
     run.status = RunStatus.BUILDING
     run.summary = "Mock builder produced a bounded implementation artifact."
     return run
