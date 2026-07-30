@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       POSTGRES_PASSWORD: ci-only-password
+      MINIO_ROOT_PASSWORD: ci-only-password
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
