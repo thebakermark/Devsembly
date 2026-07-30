@@ -75,6 +75,8 @@ async def create_membership(
                 action="membership.created",
                 object_type="organization",
                 object_id=str(organization_id),
+                organization_id=organization_id,
+                outcome="success",
                 payload={"principal_id": str(payload.principal_id), "role": payload.role},
             )
         )
@@ -125,6 +127,8 @@ async def update_membership(
                 action="membership.updated",
                 object_type="membership",
                 object_id=str(membership.id),
+                organization_id=organization_id,
+                outcome="success",
                 payload={"role": payload.role, "status": payload.status},
             )
         )
@@ -179,6 +183,9 @@ async def create_delegation(
                 action="delegation.created",
                 object_type="delegation",
                 object_id=str(delegation.id),
+                organization_id=organization_id,
+                project_id=payload.project_id,
+                outcome="success",
                 payload={
                     "recipient_principal_id": str(payload.recipient_principal_id),
                     "action": payload.action,
@@ -215,6 +222,9 @@ async def revoke_delegation(
                     action="delegation.revoked",
                     object_type="delegation",
                     object_id=str(delegation.id),
+                    organization_id=organization_id,
+                    project_id=delegation.project_id,
+                    outcome="success",
                     payload={},
                 )
             )

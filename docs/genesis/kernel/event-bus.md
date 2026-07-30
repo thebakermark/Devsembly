@@ -1,6 +1,6 @@
 # Event Bus
 
-**Status:** Planned contract; PostgreSQL outbox is the Genesis transport
+**Status:** Genesis PostgreSQL transport implemented
 **Version:** 0.1.0
 
 ## Event types
@@ -20,10 +20,20 @@ are prohibited.
 
 ## Delivery semantics
 
-Genesis uses at-least-once delivery from a transactional PostgreSQL outbox. Producers
-write domain state and outbox entry atomically. Consumers are idempotent, record
-processing outcomes, enforce schema compatibility, and dead-letter or escalate bounded
-failure.
+Genesis writes domain state, an append-only audit record, and the outbox entry in one
+transaction. A dedicated publisher claims committed entries with time-bounded leases and
+atomically inserts them into the durable `published_events` feed while acknowledging the
+outbox row. The event UUID is the feed's primary key, so recovery after a crash cannot
+create a second publication.
+
+Failed publication attempts release their lease and become available after bounded
+exponential backoff. A crashed worker's lease expires so another worker can safely claim
+the event. The publisher writes a PostgreSQL heartbeat used by its container health check
+and the API readiness endpoint.
+
+Consumers still must be idempotent because their own processing can fail after reading a
+published event. Consumer checkpoints and dead-letter handling belong to the consumer
+slice; Temporal dispatch is the next consumer.
 
 Event order is guaranteed only where a documented aggregate or partition rule provides
 it. Consumers must not infer global order.
@@ -36,5 +46,7 @@ rewritten.
 
 ## Validation
 
-Tests cover atomic write, duplicate delivery, consumer restart, out-of-order input,
-incompatible schema, poison event, retry exhaustion, and audit correlation.
+Current tests cover atomic audit/outbox writes, idempotent publication, retry scheduling,
+expired-lease recovery, duplicate prevention, and stale worker health. Consumer
+checkpoint, out-of-order input, incompatible-schema, poison-event, and retry-exhaustion
+tests remain with the first consumers.

@@ -143,12 +143,12 @@ Successful writes emit:
 - `genesis.decision.approved`;
 - `genesis.decision.rejected`.
 
-The domain record and matching outbox event commit or roll back together. Publication
-remains the responsibility of a later idempotent outbox worker.
+The domain record, correlated audit record, and matching outbox event commit or roll back
+together. The outbox publisher delivers the committed event idempotently to the durable
+PostgreSQL event feed.
 
 ## Current authority and security boundary
 
-`decided_by` is a declared identifier recorded for provenance; it is not yet an
-authenticated identity or authorization proof. The API does not claim that the caller
-has budget authority. External OIDC, organization membership, delegation, approval
-limits, and audit writers remain required before production multi-tenant exposure.
+`decided_by` is derived from the authenticated principal. OIDC identity, organization
+membership, role and delegation policy, and authorization audit evidence are enforced.
+Per-delegation monetary approval limits remain a later capability.

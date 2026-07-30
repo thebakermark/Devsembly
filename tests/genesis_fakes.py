@@ -36,6 +36,7 @@ class MemoryStore:
     workflow_step_attempts: dict[uuid.UUID, WorkflowStepAttempt] = field(default_factory=dict)
     evidence: dict[uuid.UUID, Evidence] = field(default_factory=dict)
     outbox: list[OutboxMessage] = field(default_factory=list)
+    audit_events: list[dict[str, object]] = field(default_factory=list)
     commits: int = 0
     rollbacks: int = 0
 
@@ -453,6 +454,16 @@ class MemoryOutboxRepository:
 
     async def add(self, message: OutboxMessage) -> OutboxMessage:
         self.store.outbox.append(message)
+        self.store.audit_events.append(
+            {
+                "actor_type": message.actor_type,
+                "actor_id": message.actor_id,
+                "action": message.topic,
+                "object_id": message.aggregate_id,
+                "correlation_id": str(message.id),
+                "payload": {"event_id": str(message.id), **message.payload},
+            }
+        )
         return message
 
 

@@ -8,6 +8,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Identity,
     Index,
     Integer,
     Numeric,
@@ -519,6 +520,15 @@ class WorkflowStepAttempt(Base):
 
 class AuditEvent(Base):
     __tablename__ = "audit_events"
+    __table_args__ = (
+        CheckConstraint(
+            "outcome IN ('success', 'allow', 'deny', 'failure')",
+            name="ck_audit_events_outcome",
+        ),
+        Index("ix_audit_events_organization_occurred", "organization_id", "occurred_at"),
+        Index("ix_audit_events_project_occurred", "project_id", "occurred_at"),
+        Index("ix_audit_events_correlation_id", "correlation_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     occurred_at: Mapped[datetime] = mapped_column(
@@ -529,6 +539,12 @@ class AuditEvent(Base):
     action: Mapped[str] = mapped_column(String(120), nullable=False)
     object_type: Mapped[str] = mapped_column(String(120), nullable=False)
     object_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    project_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    correlation_id: Mapped[str | None] = mapped_column(String(255))
+    outcome: Mapped[str] = mapped_column(
+        String(20), default="success", server_default=text("'success'"), nullable=False
+    )
     payload: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict, nullable=False)
 
 
@@ -585,6 +601,16 @@ class Evidence(Base):
 
 class OutboxEvent(Base):
     __tablename__ = "outbox_events"
+    __table_args__ = (
+        CheckConstraint("attempt_count >= 0", name="ck_outbox_events_attempt_count"),
+        Index(
+            "ix_outbox_events_publishable",
+            "available_at",
+            "occurred_at",
+            postgresql_where=text("published_at IS NULL"),
+        ),
+        Index("ix_outbox_events_claimed_until", "claimed_until"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     occurred_at: Mapped[datetime] = mapped_column(
@@ -594,3 +620,51 @@ class OutboxEvent(Base):
     aggregate_id: Mapped[str] = mapped_column(String(255), nullable=False)
     payload: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempt_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    claimed_by: Mapped[str | None] = mapped_column(String(255))
+    claimed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
+
+
+class PublishedEvent(Base):
+    __tablename__ = "published_events"
+    __table_args__ = (
+        Index("ix_published_events_sequence", "sequence", unique=True),
+        Index("ix_published_events_topic_sequence", "topic", "sequence"),
+    )
+
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("outbox_events.id", ondelete="RESTRICT"),
+        primary_key=True,
+    )
+    sequence: Mapped[int] = mapped_column(Integer, Identity(always=False), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    published_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    topic: Mapped[str] = mapped_column(String(120), nullable=False)
+    aggregate_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    payload: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+
+
+class WorkerHeartbeat(Base):
+    __tablename__ = "worker_heartbeats"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('starting', 'ready', 'degraded', 'stopping')",
+            name="ck_worker_heartbeats_status",
+        ),
+    )
+
+    worker_name: Mapped[str] = mapped_column(String(120), primary_key=True)
+    worker_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    detail: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict, nullable=False)

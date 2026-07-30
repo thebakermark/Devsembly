@@ -135,13 +135,14 @@ Successful operations emit:
 - `genesis.workflow_run.retry_created`;
 - `genesis.workflow_step.attempt_recorded`.
 
-Domain records and their event commit together. Event publication remains a later,
-idempotent outbox-worker capability.
+Domain records, correlated audit records, and their events commit together. The outbox
+publisher delivers committed events idempotently to the durable PostgreSQL event feed.
 
 ## Current boundary
 
-These endpoints do not start Temporal workflows, publish outbox messages, automatically
-evaluate budgets, write audit events, or grant authorization. Explicit evaluation and
-decision operations are now available through the
+These endpoints do not yet start Temporal workflows or automatically evaluate budgets.
+They do write audit and outbox records atomically, publish committed events through the
+outbox worker, and enforce organization authorization. Explicit evaluation and decision
+operations are available through the
 [Cost Governance API](cost-governance-api.md); automatic workflow admission based on
 those records remains a later integration slice.

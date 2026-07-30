@@ -20,6 +20,8 @@ def test_genesis_tables_are_registered() -> None:
         "audit_events",
         "evidence",
         "outbox_events",
+        "published_events",
+        "worker_heartbeats",
     }.issubset(Base.metadata.tables)
 
 
@@ -113,3 +115,14 @@ def test_evidence_retention_is_server_governed() -> None:
     assert any(
         constraint.name == "ck_evidence_retention_deadline" for constraint in table.constraints
     )
+
+
+def test_outbox_publication_and_audit_columns_are_registered() -> None:
+    outbox = Base.metadata.tables["outbox_events"]
+    audit = Base.metadata.tables["audit_events"]
+    published = Base.metadata.tables["published_events"]
+    assert outbox.c.attempt_count.nullable is False
+    assert outbox.c.available_at.nullable is False
+    assert published.c.event_id.primary_key is True
+    assert audit.c.outcome.nullable is False
+    assert audit.c.correlation_id.nullable is True

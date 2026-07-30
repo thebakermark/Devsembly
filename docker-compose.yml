@@ -97,6 +97,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+      event-publisher:
+        condition: service_healthy
     environment:
       DEVSEMBLY_TEMPORAL_ADDRESS: temporal:7233
       DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-devsembly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-devsembly}
@@ -116,6 +118,24 @@ services:
       retries: 20
     ports:
       - "127.0.0.1:${DEVSEMBLY_API_PORT:-8000}:8000"
+    networks: [control-plane]
+
+  event-publisher:
+    build: .
+    restart: unless-stopped
+    command: python -m devsembly.outbox_publisher
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-devsembly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-devsembly}
+      DEVSEMBLY_OUTBOX_POLL_SECONDS: ${DEVSEMBLY_OUTBOX_POLL_SECONDS:-1}
+      DEVSEMBLY_OUTBOX_HEALTH_MAX_AGE_SECONDS: ${DEVSEMBLY_OUTBOX_HEALTH_MAX_AGE_SECONDS:-30}
+    healthcheck:
+      test: ["CMD", "python", "-m", "devsembly.outbox_publisher", "--healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     networks: [control-plane]
 
   worker:

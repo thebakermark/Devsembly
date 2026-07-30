@@ -18,6 +18,7 @@ from jwt.algorithms import AllowedPublicKeys
 from sqlalchemy import or_, select
 
 from devsembly import models
+from devsembly.audit import set_current_audit_actor
 from devsembly.database import SessionFactory
 
 
@@ -182,6 +183,7 @@ async def authenticated_principal(
                 action="identity.authenticated",
                 object_type="principal",
                 object_id=str(principal.id),
+                outcome="success",
                 payload={"issuer": issuer},
             )
         )
@@ -204,6 +206,7 @@ def required_permission(request: Request) -> Permission:
 
 
 async def authorize_request(request: Request, principal: CurrentPrincipal) -> PrincipalContext:
+    set_current_audit_actor("human", str(principal.principal_id))
     organization_id = request.path_params.get("organization_id")
     if organization_id is None:
         if request.method == "POST" and request.url.path == "/api/v1/organizations":
@@ -255,6 +258,9 @@ async def authorize_request(request: Request, principal: CurrentPrincipal) -> Pr
                 action="authorization.evaluated",
                 object_type="organization",
                 object_id=str(parsed_organization_id),
+                organization_id=parsed_organization_id,
+                project_id=project_id,
+                outcome="allow" if allowed else "deny",
                 payload={"permission": permission.value, "outcome": "allow" if allowed else "deny"},
             )
         )
@@ -286,6 +292,8 @@ class IdentityManager:
                     action="organization.owner_bootstrapped",
                     object_type="organization",
                     object_id=str(organization_id),
+                    organization_id=organization_id,
+                    outcome="success",
                     payload={"role": "owner"},
                 )
             )

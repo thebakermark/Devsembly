@@ -310,3 +310,5 @@ class OutboxMessage:
     topic: str
     aggregate_id: str
     payload: dict[str, object]
+    actor_type: str = "service"
+    actor_id: str = "genesis-control-plane"

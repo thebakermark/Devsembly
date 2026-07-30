@@ -167,8 +167,10 @@ async def test_unit_of_work_rolls_back_domain_and_outbox_together(
     async with postgres_factory() as session:
         stored_organization = await session.get(models.Organization, organization_id)
         stored_event = await session.get(models.OutboxEvent, event.id)
+        audit_count = await session.scalar(select(func.count()).select_from(models.AuditEvent))
     assert stored_organization is None
     assert stored_event is None
+    assert audit_count == 0
 
 
 async def test_workflow_repositories_persist_scope_idempotency_attempts_and_retry(

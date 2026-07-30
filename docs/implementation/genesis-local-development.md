@@ -25,7 +25,8 @@ Compose performs the following sequence:
 1. starts PostgreSQL, Redis, MinIO, Temporal and the Temporal UI;
 2. waits for PostgreSQL and Temporal health checks;
 3. runs `alembic upgrade head` through the one-shot `migrate` service;
-4. starts the FastAPI control plane and Temporal worker.
+4. starts the outbox publisher and waits for its persisted readiness heartbeat;
+5. starts the FastAPI control plane and Temporal worker.
 
 ## Local endpoints
 
@@ -48,8 +49,9 @@ pytest
 ```
 
 The project-scoped workflow API persists an `accepted` run before provider execution.
-The earlier direct `POST /runs` Temporal start route is intentionally unavailable. A
-later dispatcher will start only committed workflow runs.
+The outbox publisher makes that committed event available in the durable PostgreSQL
+event feed. The earlier direct `POST /runs` Temporal start route is intentionally
+unavailable. The next dispatcher slice will consume only committed workflow events.
 
 ## Migration workflow
 

@@ -167,7 +167,10 @@ Genesis v0.1 is complete when:
   current
 - Immutable evidence ingestion, authorized retrieval, retention metadata, and the MinIO
   object-storage adapter — current
-- Complete audit writers, actual usage, and adaptive forecasting — remaining
+- Append-only audit writers for state and authorization decisions — current
+- Idempotent transactional-outbox publication, retry, recovery, and worker health —
+  current
+- Actual usage and adaptive forecasting — remaining
 
 ### G2 — Governed workflow skeleton
 
@@ -261,10 +264,22 @@ Completed in the evidence lifecycle slice:
 5. Added compensating object cleanup, transactional outbox records, migration, API,
    storage, isolation, integrity, and retention tests.
 
+Completed in the audit and event-publication slice:
+
+1. Added correlated append-only audit records for important domain writes and explicit
+   allow/deny authorization outcomes.
+2. Added a leased PostgreSQL outbox publisher with bounded exponential retry scheduling
+   and safe takeover after worker crashes.
+3. Added the durable `published_events` feed, keyed by source event UUID, and atomic
+   publication acknowledgement to prevent duplicate publication.
+4. Added persisted worker heartbeats, a container health check, and API readiness
+   reporting.
+5. Added PostgreSQL idempotency, backoff, crash-recovery, heartbeat, audit-atomicity,
+   migration, Compose, and live-stack validation.
+
 Next:
 
-1. Add complete audit writers and an idempotent outbox publisher worker.
-2. Dispatch committed workflow runs to Temporal and add restart-recovery tests.
-3. Connect workflow admission to cost evaluation and decision state.
-4. Add actual usage ingestion, adaptive forecasting, and the first complete
+1. Dispatch committed workflow runs to Temporal and add restart-recovery tests.
+2. Connect workflow admission to cost evaluation and decision state.
+3. Add actual usage ingestion, adaptive forecasting, and the first complete
    end-to-end `$50/month` acceptance scenario.

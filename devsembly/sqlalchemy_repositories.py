@@ -927,6 +927,8 @@ class SqlAlchemyOutboxRepository:
         self._session = session
 
     async def add(self, message: OutboxMessage) -> OutboxMessage:
+        organization_id = message.payload.get("organization_id")
+        project_id = message.payload.get("project_id")
         self._session.add(
             models.OutboxEvent(
                 id=message.id,
@@ -934,6 +936,24 @@ class SqlAlchemyOutboxRepository:
                 topic=message.topic,
                 aggregate_id=message.aggregate_id,
                 payload=message.payload,
+                available_at=message.occurred_at,
+            )
+        )
+        self._session.add(
+            models.AuditEvent(
+                occurred_at=message.occurred_at,
+                actor_type=message.actor_type,
+                actor_id=message.actor_id,
+                action=message.topic,
+                object_type=message.topic.removeprefix("genesis.").rsplit(".", 1)[0],
+                object_id=message.aggregate_id,
+                organization_id=(
+                    uuid.UUID(organization_id) if isinstance(organization_id, str) else None
+                ),
+                project_id=uuid.UUID(project_id) if isinstance(project_id, str) else None,
+                correlation_id=str(message.id),
+                outcome="success",
+                payload={"event_id": str(message.id), **message.payload},
             )
         )
         await self._session.flush()

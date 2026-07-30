@@ -5,6 +5,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from devsembly.audit import current_audit_actor
 from devsembly.domain import (
     Budget,
     BudgetEnforcementMode,
@@ -34,12 +35,15 @@ class GenesisService:
     def _message(
         self, topic: str, aggregate_id: uuid.UUID, payload: dict[str, object]
     ) -> OutboxMessage:
+        actor_type, actor_id = current_audit_actor()
         return OutboxMessage(
             id=uuid.uuid4(),
             occurred_at=self._clock(),
             topic=topic,
             aggregate_id=str(aggregate_id),
             payload=payload,
+            actor_type=actor_type,
+            actor_id=actor_id,
         )
 
     async def create_organization(self, name: str) -> Organization:

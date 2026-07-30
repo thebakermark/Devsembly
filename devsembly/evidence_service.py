@@ -7,6 +7,7 @@ from collections.abc import Callable, Sequence
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 
+from devsembly.audit import current_audit_actor
 from devsembly.domain import (
     Evidence,
     EvidenceKind,
@@ -96,6 +97,7 @@ class EvidenceService:
                     created_at=now,
                 )
                 await unit.evidence.add(evidence)
+                actor_type, actor_id = current_audit_actor()
                 await unit.outbox.add(
                     OutboxMessage(
                         id=uuid.uuid4(),
@@ -109,6 +111,8 @@ class EvidenceService:
                             "sha256": evidence.sha256,
                             "retention_class": retention_class.value,
                         },
+                        actor_type=actor_type,
+                        actor_id=actor_id,
                     )
                 )
                 await unit.commit()

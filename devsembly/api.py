@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Awaitable, Callable
 from typing import cast
 
 from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from temporalio.client import Client
 
+from devsembly.audit import reset_current_audit_actor, set_current_audit_actor
 from devsembly.contracts import FactoryRun
 from devsembly.cost_api import router as cost_router
 from devsembly.database import check_database
@@ -23,6 +25,7 @@ from devsembly.evidence_api import router as evidence_router
 from devsembly.genesis_api import router as genesis_router
 from devsembly.identity_api import organization_router as identity_organization_router
 from devsembly.identity_api import router as identity_router
+from devsembly.outbox_publisher import worker_readiness
 from devsembly.workflow_api import internal_router as workflow_internal_router
 from devsembly.workflow_api import router as workflow_router
 
@@ -34,6 +37,18 @@ app.include_router(cost_router)
 app.include_router(identity_router)
 app.include_router(identity_organization_router)
 app.include_router(evidence_router)
+
+
+@app.middleware("http")
+async def audit_actor_scope(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    token = set_current_audit_actor("service", "genesis-control-plane")
+    try:
+        return await call_next(request)
+    finally:
+        reset_current_audit_actor(token)
 
 
 @app.exception_handler(ResourceNotFoundError)
@@ -154,6 +169,12 @@ async def readiness() -> dict[str, str]:
         checks["postgres"] = "ok"
     except Exception as exc:  # noqa: BLE001 - readiness reports dependency failures
         checks["postgres"] = f"unavailable: {type(exc).__name__}"
+
+    try:
+        outbox_status = await worker_readiness()
+        checks["outbox_publisher"] = "ok" if outbox_status["ready"] is True else "unavailable"
+    except Exception as exc:  # noqa: BLE001 - readiness reports dependency failures
+        checks["outbox_publisher"] = f"unavailable: {type(exc).__name__}"
 
     if any(value != "ok" for value in checks.values()):
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=checks)

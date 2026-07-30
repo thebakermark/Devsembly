@@ -74,8 +74,9 @@ outbox event commit in one PostgreSQL transaction. Leaving a Unit of Work withou
 explicit commit rolls both back.
 
 Create and update operations emit `genesis.<resource>.created` or
-`genesis.<resource>.updated`. The outbox writer is current; delivery and consumer
-idempotency remain a later capability.
+`genesis.<resource>.updated`. The publisher uses leases, bounded retry backoff, atomic
+acknowledgement, and event-ID deduplication to place committed events in the durable
+PostgreSQL event feed. Downstream consumers remain responsible for idempotent processing.
 
 Project-scoped workflow execution intent uses the separate
 [Workflow Run API v1](workflow-run-api.md). It reuses these transaction and isolation
