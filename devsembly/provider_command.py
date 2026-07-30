@@ -20,7 +20,12 @@ class CommandCodingProvider:
     def __init__(self, command: str | None = None) -> None:
         self.command = command or os.getenv("DEVSEMBLY_CODING_PROVIDER_COMMAND", "")
 
-    async def _execute(self, payload: dict[str, object], workspace: Path) -> BuildResult:
+    async def _execute(
+        self,
+        payload: dict[str, object],
+        workspace: Path,
+        allowed_paths: list[str],
+    ) -> BuildResult:
         if not self.command:
             raise RuntimeError("DEVSEMBLY_CODING_PROVIDER_COMMAND is not configured")
         process = await asyncio.create_subprocess_shell(
@@ -34,8 +39,7 @@ class CommandCodingProvider:
         if process.returncode != 0:
             raise RuntimeError(f"Coding provider failed: {stderr.decode(errors='replace')[-4000:]}")
         paths = await changed_paths(workspace)
-        allowed = [str(item) for item in payload["allowed_paths"]]  # type: ignore[index]
-        enforce_allowed_paths(paths, allowed)
+        enforce_allowed_paths(paths, allowed_paths)
         summary = stdout.decode(errors="replace").strip()[-4000:] or "Provider completed."
         return BuildResult(summary=summary, changed_paths=paths)
 
@@ -49,6 +53,7 @@ class CommandCodingProvider:
                 "validation_commands": task.validation_commands,
             },
             workspace,
+            task.allowed_paths,
         )
 
     async def repair(
@@ -69,4 +74,5 @@ class CommandCodingProvider:
                 "evidence": [item.model_dump(mode="json") for item in evidence],
             },
             workspace,
+            task.allowed_paths,
         )
