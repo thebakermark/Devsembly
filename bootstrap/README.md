@@ -1,6 +1,8 @@
 # Devsembly Genesis Bootstrap v1
 
-This directory contains the first executable bootstrap for turning a fresh Ubuntu Server 24.04 LTS VM into a reproducible Devsembly host.
+This directory contains the first executable bootstrap for turning a fresh **Development Host** running a supported Ubuntu LTS release into a reproducible Devsembly host.
+
+Ubuntu LTS is currently the only host operating system built, tested, and supported by Devsembly. The installer is intentionally Ubuntu-specific. Infrastructure-provider details should remain outside the shared installation flow wherever practical.
 
 ## Included
 
@@ -14,14 +16,15 @@ This directory contains the first executable bootstrap for turning a fresh Ubunt
 - Systemd unit for the Docker Compose control plane
 - Bootstrap status and log files
 - Post-install validation command
-- Vultr-compatible cloud-init entry point
+- Cloud-init entry point compatible with supported providers
 
-## New Vultr VM installation
+## Provision a new Development Host
 
-1. Create an Ubuntu Server 24.04 LTS VM.
-2. Use the contents of `bootstrap/cloud-init.yaml` as the Vultr startup script or cloud-init user data.
-3. Wait for cloud-init to finish.
-4. Log in through SSH and run:
+1. Provision a server using a supported Ubuntu LTS image.
+2. Follow the guide for your infrastructure provider in [`../docs/providers/`](../docs/providers/).
+3. Supply `bootstrap/cloud-init.yaml` as startup-script or cloud-init user data when the provider supports it.
+4. Wait for cloud-init to finish.
+5. Connect through SSH and run:
 
 ```bash
 sudo cloud-init status --wait
@@ -37,10 +40,10 @@ Bootstrap output is stored at:
 
 ## Direct installation
 
-From an existing Ubuntu 24.04 host:
+From an existing Development Host running a supported Ubuntu LTS release:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/thebakermark/Devsembly/build/genesis-bootstrap-v1/bootstrap/devsembly-bootstrap.sh \
+curl -fsSL https://raw.githubusercontent.com/thebakermark/Devsembly/main/bootstrap/devsembly-bootstrap.sh \
   -o /tmp/devsembly-bootstrap.sh
 sudo bash /tmp/devsembly-bootstrap.sh
 ```
@@ -60,4 +63,6 @@ The installer accepts these environment variables:
 
 ## Current boundary
 
-This v1 bootstrap prepares and secures the host and starts the repository's development Compose stack when `infrastructure/docker/compose.dev.yaml` is present. Domain-based HTTPS, secret-provider enrollment, off-host backups, and the browser setup wizard belong to the next bootstrap iterations.
+This v1 bootstrap prepares and secures the Development Host and starts the repository's development Compose stack when `infrastructure/docker/compose.dev.yaml` is present. Domain-based HTTPS, secret-provider enrollment, off-host backups, and the browser setup wizard belong to later bootstrap iterations.
+
+Provider-specific provisioning, networking, image names, plans, and startup-script procedures belong in provider guides. See [`../docs/platform-support.md`](../docs/platform-support.md) for the support policy.

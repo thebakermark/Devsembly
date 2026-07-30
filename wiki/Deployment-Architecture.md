@@ -2,28 +2,38 @@
 
 ## Recommended initial layout
 
-### VM 1: Development control server
+### Development Host: control plane and development services
 
-- Ubuntu 24.04 LTS
+- Supported Ubuntu LTS release
 - 8 vCPU recommended
 - 16–32 GB RAM
-- 250 GB NVMe
-- OpenClaw, Archon, Claude Code, Codex, code-server, Docker, Git worktrees, test services
+- 250 GB NVMe or equivalent SSD-backed storage
+- OpenClaw, Archon, Claude Code, Codex, code-server, Docker, Git worktrees, and test services
 
-### VM 2: Coolify management and staging
+The Development Host may run on any validated infrastructure provider. Provider selection should not change the shared Devsembly application architecture.
 
-- Ubuntu 24.04 LTS
+### Staging Host: Coolify management and staging
+
+- Supported Ubuntu LTS release
 - 4 vCPU
 - 8 GB RAM
 - Coolify and staging workloads during the initial phase
 
+This may initially be combined with the Development Host for testing, but separating it reduces operational and security risk.
+
 ### External services
 
 - GitHub repositories and Actions
-- S3-compatible off-server backup storage
+- S3-compatible off-host backup storage
 - DNS provider
 - Optional hosted model APIs
 
+## Provider boundary
+
+Provider-specific plans, images, firewalls, private networking, snapshots, object storage, and startup-script identifiers belong in provider configuration and provider-specific documentation. Shared architecture documentation should describe hosts and required capabilities rather than a particular vendor's product names.
+
 ## Later production layout
 
-Move production to its own server. Never install OpenClaw, Archon, code-server, development workspaces, or development credentials on the production server.
+Move production to its own **Production Host**. Never install OpenClaw, Archon, code-server, development workspaces, or development credentials on the Production Host.
+
+Production operating-system and provider support must be documented and validated separately before a configuration is marked supported.
