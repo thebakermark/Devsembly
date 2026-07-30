@@ -73,7 +73,7 @@ Idea
 
 ## Repository status
 
-This repository currently contains the product foundation, workflow specifications, agent role contracts, infrastructure blueprint, security model, initial CI scaffolding, and the Genesis reference implementation plan. Application services will be added incrementally through reviewed pull requests.
+This repository contains the product foundation, workflow specifications, agent role contracts, infrastructure blueprint, security model, initial CI scaffolding, and the first runnable Genesis control-plane scaffold. Application capabilities will continue to be added incrementally through reviewed pull requests.
 
 ## Getting started
 
@@ -82,8 +82,8 @@ This repository currently contains the product foundation, workflow specificatio
 3. Read [`docs/vision/product-vision.md`](docs/vision/product-vision.md).
 4. Review [`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md).
 5. Review [`docs/security/trust-model.md`](docs/security/trust-model.md).
-6. Read the [`Genesis Reference Implementation Plan`](docs/implementation/genesis-reference-implementation-plan.md).
-7. Review the longer-term roadmap in [`docs/vision/roadmap.md`](docs/vision/roadmap.md).
+6. Read the Genesis contract in [`docs/implementation/genesis-reference-implementation-plan.md`](docs/implementation/genesis-reference-implementation-plan.md).
+7. Start the runnable local stack with [`docs/implementation/genesis-local-development.md`](docs/implementation/genesis-local-development.md).
 8. Use the issue templates to propose work.
 
 ## License
