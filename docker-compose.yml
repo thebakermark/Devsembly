@@ -13,8 +13,34 @@ services:
       retries: 20
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    networks:
-      - control-plane
+    networks: [control-plane]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - redis-data:/data
+    networks: [control-plane]
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    restart: unless-stopped
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-devsembly}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    networks: [control-plane]
 
   temporal:
     image: temporalio/auto-setup:1.27.2
@@ -33,8 +59,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-    networks:
-      - control-plane
+    networks: [control-plane]
 
   temporal-ui:
     image: temporalio/ui:2.40.1
@@ -46,21 +71,35 @@ services:
       TEMPORAL_ADDRESS: temporal:7233
     ports:
       - "127.0.0.1:${TEMPORAL_UI_PORT:-8088}:8080"
-    networks:
-      - control-plane
+    networks: [control-plane]
+
+  migrate:
+    build: .
+    command: alembic upgrade head
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-devsembly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-devsembly}
+    networks: [control-plane]
 
   api:
     build: .
     restart: unless-stopped
     command: uvicorn devsembly.api:app --host 0.0.0.0 --port 8000
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       temporal:
         condition: service_healthy
-      postgres:
+      redis:
         condition: service_healthy
     environment:
       DEVSEMBLY_TEMPORAL_ADDRESS: temporal:7233
       DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-devsembly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-devsembly}
+      DEVSEMBLY_REDIS_URL: redis://redis:6379/0
+      DEVSEMBLY_OBJECT_STORE_ENDPOINT: http://minio:9000
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=5)"]
       interval: 10s
@@ -68,31 +107,33 @@ services:
       retries: 20
     ports:
       - "127.0.0.1:${DEVSEMBLY_API_PORT:-8000}:8000"
-    networks:
-      - control-plane
+    networks: [control-plane]
 
   worker:
     build: .
     restart: unless-stopped
     command: python -m devsembly.worker
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       temporal:
-        condition: service_healthy
-      postgres:
         condition: service_healthy
     environment:
       DEVSEMBLY_TEMPORAL_ADDRESS: temporal:7233
       DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-devsembly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-devsembly}
+      DEVSEMBLY_REDIS_URL: redis://redis:6379/0
+      DEVSEMBLY_OBJECT_STORE_ENDPOINT: http://minio:9000
       DEVSEMBLY_CODING_PROVIDER_COMMAND: ${DEVSEMBLY_CODING_PROVIDER_COMMAND:-/app/scripts/providers/claude-code.sh}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       DEVSEMBLY_CLAUDE_MODEL: ${DEVSEMBLY_CLAUDE_MODEL:-sonnet}
       DEVSEMBLY_CLAUDE_MAX_TURNS: ${DEVSEMBLY_CLAUDE_MAX_TURNS:-20}
       DEVSEMBLY_SOURCE_CONTROL_TOKEN: ${DEVSEMBLY_SOURCE_CONTROL_TOKEN:-}
-    networks:
-      - control-plane
+    networks: [control-plane]
 
 volumes:
   postgres-data:
+  redis-data:
+  minio-data:
 
 networks:
   control-plane:
