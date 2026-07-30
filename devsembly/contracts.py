@@ -9,8 +9,11 @@ from pydantic import BaseModel, Field, HttpUrl
 class RunStatus(StrEnum):
     QUEUED = "queued"
     PLANNING = "planning"
+    CHECKING_OUT = "checking_out"
     BUILDING = "building"
     VALIDATING = "validating"
+    REPAIRING = "repairing"
+    PUBLISHING = "publishing"
     REVIEWING = "reviewing"
     COMPLETED = "completed"
     ESCALATED = "escalated"
@@ -28,6 +31,7 @@ class ProductRequest(BaseModel):
 
 class TaskPacket(BaseModel):
     run_id: UUID
+    title: str
     objective: str
     repository_url: HttpUrl
     base_branch: str
@@ -35,6 +39,7 @@ class TaskPacket(BaseModel):
     allowed_paths: list[str]
     acceptance_criteria: list[str]
     validation_commands: list[str]
+    max_repair_attempts: int
 
 
 class ValidationEvidence(BaseModel):
@@ -42,6 +47,7 @@ class ValidationEvidence(BaseModel):
     exit_code: int
     stdout: str = ""
     stderr: str = ""
+    attempt: int = 0
 
 
 class FactoryRun(BaseModel):
@@ -50,4 +56,7 @@ class FactoryRun(BaseModel):
     request: ProductRequest
     task_packet: TaskPacket | None = None
     evidence: list[ValidationEvidence] = Field(default_factory=list)
+    changed_paths: list[str] = Field(default_factory=list)
+    repair_attempts: int = 0
+    change_request_url: str | None = None
     summary: str | None = None
