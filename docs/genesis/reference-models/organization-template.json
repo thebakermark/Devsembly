@@ -1,0 +1,50 @@
+{
+  "template_version": "0.1.0",
+  "status": "example",
+  "template_id": "reference.software-organization",
+  "name": "Software Delivery Organization",
+  "canonical": {
+    "units": [
+      {
+        "id": "unit.executive",
+        "type": "executive",
+        "parent": null
+      },
+      {
+        "id": "unit.engineering",
+        "type": "department",
+        "parent": "unit.executive"
+      },
+      {
+        "id": "unit.quality",
+        "type": "department",
+        "parent": "unit.executive"
+      }
+    ],
+    "capabilities": [
+      "product-direction",
+      "software-engineering",
+      "independent-validation",
+      "security-governance"
+    ],
+    "separation_of_duties": [
+      {
+        "proposer": "software-engineering",
+        "reviewer": "independent-validation",
+        "final_authority": "human-release-authority"
+      }
+    ]
+  },
+  "tenant_operational_data": {
+    "included": false,
+    "examples_excluded": [
+      "legal-identity",
+      "people",
+      "agent-instances",
+      "delegations",
+      "projects",
+      "budgets",
+      "evidence"
+    ]
+  }
+}

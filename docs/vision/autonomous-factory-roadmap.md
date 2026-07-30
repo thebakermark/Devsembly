@@ -143,7 +143,7 @@ Deliver a production-grade Devsembly control plane that can take an authorized p
 
 ## Recommended first implementation epic
 
-**Epic: Factory Control Plane MVP**
+### Epic: Factory Control Plane MVP
 
 Build a vertical slice that accepts one product request, generates one task packet, runs a mock builder, independently validates a fixture change, records evidence and opens a draft pull request.
 

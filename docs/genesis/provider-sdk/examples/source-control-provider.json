@@ -1,0 +1,72 @@
+{
+  "$schema": "../../schemas/provider-manifest.schema.json",
+  "schema_version": "0.1.0",
+  "provider_id": "example.source-control",
+  "adapter_id": "devsembly.example-source-control",
+  "adapter_version": "0.1.0",
+  "status": "candidate",
+  "capabilities": [
+    {
+      "id": "source-control",
+      "version": "0.1.0",
+      "operations": [
+        "repository.read",
+        "work-item.read",
+        "ref.create",
+        "commit.create",
+        "pull-request.create",
+        "check.read"
+      ]
+    }
+  ],
+  "configuration_schema": "example://source-control/config/0.1.0",
+  "authentication": {
+    "methods": [
+      "application-installation"
+    ],
+    "secret_references_only": true
+  },
+  "health": {
+    "liveness": true,
+    "readiness": true,
+    "functional_probe": "repository.read"
+  },
+  "lifecycle": {
+    "supports_drain": true,
+    "supports_upgrade_rollback": true
+  },
+  "events": {
+    "inbound": [
+      "work-item.changed",
+      "pull-request.changed",
+      "check.changed"
+    ],
+    "delivery": "at-least-once"
+  },
+  "timeouts": {
+    "default_seconds": 30,
+    "maximum_seconds": 120
+  },
+  "idempotency": {
+    "mutations": "provider-or-adapter-key"
+  },
+  "observability": {
+    "traces": true,
+    "usage": true,
+    "cost": false,
+    "redaction": "required"
+  },
+  "permissions": [
+    "repository:read",
+    "work-item:read",
+    "ref:write",
+    "commit:write",
+    "pull-request:write",
+    "check:read"
+  ],
+  "conformance": {
+    "suite_version": "0.1.0",
+    "evidence": "example://conformance/not-production-evidence"
+  },
+  "replacement_guide": "example://source-control/replacement"
+}

@@ -1,49 +1,90 @@
 # System Architecture
 
+This page is the concise repository overview. The canonical authority, dependency rules,
+current-versus-future labels, and data ownership are defined in
+[Genesis Book II](../genesis/book-2-architecture.md).
+
 ## Logical architecture
 
 ```text
-User / Product Owner
+Human owner / operator
         |
-        v
-OpenClaw Orchestrator
+Conversational and application interfaces
         |
-        v
-Archon Workflow Engine
+Executive coordination and application services
         |
-        +--> Product and architecture agents
-        +--> Claude Code and Codex engineering agents
-        +--> QA, security and documentation agents
+Domain capabilities, policy, budget, and Organizational Genome
         |
-        v
-GitHub issues, branches and pull requests
+Kernel contracts
         |
-        v
-GitHub Actions independent gates
+Provider adapters
         |
-        v
-Coolify preview -> staging -> approved production
+External providers and infrastructure
 ```
 
-## Control plane
+Human authority controls intent, delegation, budgets, high-risk approvals, and production
+release. Applications and business modules consume capabilities without depending on
+provider products.
 
-The control plane coordinates work but does not contain customer-product business logic. It includes orchestration, workflow definitions, agent registry, approvals, audit events and project configuration.
+## Genesis v0.1 runtime
 
-## Execution plane
+Genesis is a Python/FastAPI modular monolith plus workers. It uses:
 
-Coding and test agents operate in isolated Git worktrees or disposable containers. Each task receives only the repository, credentials and tools necessary for that task.
+- PostgreSQL with SQLAlchemy and Alembic for canonical structured state;
+- Temporal behind the workflow-provider interface for durable execution;
+- an external OIDC provider for authentication and internal Devsembly authorization;
+- a transactional outbox for domain event delivery;
+- MinIO-compatible object storage for large evidence;
+- Redis only for ephemeral caching and coordination;
+- Docker and Compose for the reference local deployment.
 
-## Delivery plane
+These decisions are binding through
+[`docs/architecture/decisions/`](decisions/README.md). The broader Kernel, Executive Core,
+MemoryOS, knowledge graph, and plugin model are staged in the Genesis Library and are not
+claimed as complete runtime services.
 
-GitHub Actions performs independent validation. Coolify manages disposable preview environments, staging and approved production deployments.
+## Planes
 
-## Knowledge plane
+### Control plane
 
-Authoritative knowledge is stored in versioned repository documents, issues, architecture decision records, pull requests, test results and release notes. Agent memory is never the sole source of truth.
+The control plane coordinates organization-scoped work, capability selection, policy,
+budgets, workflows, approvals, decisions, and audit. It does not contain customer-product
+business logic.
+
+### Execution plane
+
+Coding and validation agents operate in isolated workspaces or containers with scoped
+credentials, bounded tools, and explicit delegation. Implementation and high-risk review
+remain separate.
+
+### Delivery plane
+
+Source-control, independent-validation, and deployment providers manage repository
+evidence, checks, preview, staging, rollback, and approved promotion. The initial
+adapters may use GitHub and Coolify, but core workflow depends on provider contracts.
+
+### Knowledge plane
+
+Canonical knowledge is versioned, attributable, policy-controlled, and linked to
+evidence. Repository documents, decisions, source-control records, database records, and
+object evidence have explicit authority scopes. Agent context and chat history are not
+the sole source of truth.
+
+## Current development-factory mapping
+
+The current workstation documentation names initial tools such as OpenClaw for
+conversational intake, Archon for workflow specification, coding agents for execution,
+GitHub for source-control evidence, and Coolify for deployment. These are provider
+choices and development-factory components, not permanent platform boundaries or runtime
+dependencies of products built by Devsembly.
 
 ## Initial deployment topology
 
-- Development control VM: OpenClaw, Archon, browser IDE, coding agents and local test services
-- Coolify management VM: deployment control only
-- Staging VM: production-like application stack
-- Production infrastructure: isolated from all development agents
+- **Development Host:** control-plane application, workflow worker, browser IDE, coding
+  agents, and local test services
+- **Deployment management:** isolated deployment-provider control
+- **Staging:** production-like validation without production data or credentials
+- **Production:** isolated from development agents and promoted only with human authority
+
+Topology may evolve only through evidence, budget analysis, security review, and an ADR
+when the change is architecturally significant.

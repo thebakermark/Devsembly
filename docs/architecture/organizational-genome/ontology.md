@@ -3,18 +3,23 @@
 ## Primary entities
 
 ### Organization
+
 A governed operating system composed of one or more legal entities, business units, departments, teams, positions, and agent instances.
 
 ### Legal entity
+
 A jurisdiction-specific company, nonprofit, public body, partnership, or other legally recognized entity.
 
 ### Organizational unit
+
 A generic parent type for business unit, department, division, branch, and team.
 
 ### Position
+
 A versioned definition of mission, responsibilities, duties, skills, knowledge, tools, policies, authority, memory, training, performance measures, and reporting relationships.
 
 ### Agent instance
+
 A runtime worker assigned to exactly one active position version and governed by that position's approved configuration.
 
 ## Supporting entities

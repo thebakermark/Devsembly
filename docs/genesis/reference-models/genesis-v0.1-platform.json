@@ -1,0 +1,47 @@
+{
+  "model_version": "0.1.0",
+  "status": "example",
+  "release": "genesis-v0.1",
+  "budget": {
+    "currency": "USD",
+    "monthly_limit": "50.00",
+    "hard_limit": true
+  },
+  "binding_current": {
+    "runtime": "python-fastapi-modular-monolith",
+    "relational_database": "postgresql-sqlalchemy-alembic",
+    "workflow_adapter": "temporal",
+    "object_storage_adapter": "minio-compatible",
+    "ephemeral_coordination": "redis",
+    "container_runtime": "docker-compose"
+  },
+  "binding_planned": [
+    "organization-registry",
+    "initiative-registry",
+    "project-registry",
+    "budget-policy",
+    "decision-and-audit",
+    "governed-workflow",
+    "provider-conformance"
+  ],
+  "proposed": [
+    "kernel-logical-boundary",
+    "executive-core",
+    "memoryos",
+    "capability-registry",
+    "provider-manager",
+    "plugin-model"
+  ],
+  "deferred": [
+    "dedicated-graph-database",
+    "dynamic-plugin-marketplace",
+    "kubernetes",
+    "multi-region",
+    "companyos-business-modules"
+  ],
+  "authority": {
+    "human_final": true,
+    "production_agent_release": false,
+    "provider_independent": true
+  }
+}

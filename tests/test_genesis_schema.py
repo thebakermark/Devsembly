@@ -1,5 +1,5 @@
-from devsembly.database import Base
 from devsembly import models  # noqa: F401
+from devsembly.database import Base
 
 
 def test_genesis_tables_are_registered() -> None:
