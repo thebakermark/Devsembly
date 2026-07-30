@@ -129,6 +129,7 @@ async def update_membership(
             )
         )
         await session.flush()
+        await session.refresh(membership)
         return MembershipRead.model_validate(membership)
 
 
@@ -218,4 +219,5 @@ async def revoke_delegation(
                 )
             )
             await session.flush()
+            await session.refresh(delegation)
         return DelegationRead.model_validate(delegation)
