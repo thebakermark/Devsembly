@@ -12,14 +12,16 @@ from devsembly.factory import (
     execute_autonomous_run,
     independent_review,
 )
+from devsembly.temporal_workflows import CommittedWorkflow
 
 
 async def main() -> None:
     client = await Client.connect(os.getenv("DEVSEMBLY_TEMPORAL_ADDRESS", "localhost:7233"))
+    task_queue = os.getenv("DEVSEMBLY_TEMPORAL_TASK_QUEUE", "devsembly-factory")
     worker = Worker(
         client,
-        task_queue="devsembly-factory",
-        workflows=[FactoryWorkflow],
+        task_queue=task_queue,
+        workflows=[FactoryWorkflow, CommittedWorkflow],
         activities=[create_task_packet, execute_autonomous_run, independent_review],
     )
     await worker.run()

@@ -653,6 +653,59 @@ class PublishedEvent(Base):
     payload: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
 
 
+class WorkflowDispatch(Base):
+    __tablename__ = "workflow_dispatches"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'dispatched', 'skipped')",
+            name="ck_workflow_dispatches_status",
+        ),
+        CheckConstraint(
+            "attempt_count >= 0",
+            name="ck_workflow_dispatches_attempt_count",
+        ),
+        Index(
+            "ix_workflow_dispatches_claimable",
+            "available_at",
+            "created_at",
+            postgresql_where=text("status = 'pending'"),
+        ),
+        Index("ix_workflow_dispatches_claimed_until", "claimed_until"),
+    )
+
+    workflow_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workflow_runs.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    source_event_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("published_events.event_id", ondelete="RESTRICT"),
+        unique=True,
+        nullable=False,
+    )
+    temporal_workflow_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default=text("'pending'"), nullable=False
+    )
+    attempt_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    claimed_by: Mapped[str | None] = mapped_column(String(255))
+    claimed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
 class WorkerHeartbeat(Base):
     __tablename__ = "worker_heartbeats"
     __table_args__ = (

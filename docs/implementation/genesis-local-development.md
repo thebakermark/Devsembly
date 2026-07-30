@@ -26,7 +26,8 @@ Compose performs the following sequence:
 2. waits for PostgreSQL and Temporal health checks;
 3. runs `alembic upgrade head` through the one-shot `migrate` service;
 4. starts the outbox publisher and waits for its persisted readiness heartbeat;
-5. starts the FastAPI control plane and Temporal worker.
+5. starts the committed-run dispatcher and waits for its persisted readiness heartbeat;
+6. starts the FastAPI control plane and Temporal worker.
 
 ## Local endpoints
 
@@ -50,8 +51,12 @@ pytest
 
 The project-scoped workflow API persists an `accepted` run before provider execution.
 The outbox publisher makes that committed event available in the durable PostgreSQL
-event feed. The earlier direct `POST /runs` Temporal start route is intentionally
-unavailable. The next dispatcher slice will consume only committed workflow events.
+event feed. The dispatcher consumes only that committed feed, reserves a stable
+`genesis-run-<UUID>` Temporal workflow ID, and transitions the run to `queued` before
+starting Temporal. Leased dispatch records, bounded retry scheduling, and Temporal's
+workflow-ID uniqueness make restarts safe even when a process stops after Temporal
+accepts a start but before PostgreSQL records the acknowledgement. The earlier direct
+`POST /runs` Temporal start route remains intentionally unavailable.
 
 ## Migration workflow
 

@@ -9,9 +9,9 @@ provider can execute work. It extends the
 [Genesis Registry API](api-reference.md) and uses the same repository, Unit of Work,
 organization-isolation, optimistic-concurrency, and transactional-outbox boundaries.
 
-Temporal dispatch is not part of this slice. The former direct `POST /runs` start route
-has been removed so uncommitted workflow intent cannot bypass governance. A later
-dispatcher will read committed `accepted` runs and correlate them to Temporal without
+Temporal dispatch consumes only the durable published-event feed. The former direct
+`POST /runs` start route remains removed so uncommitted workflow intent cannot bypass
+governance. The dispatcher correlates committed `accepted` runs to Temporal without
 making Temporal the business-state authority.
 
 ## Resource hierarchy
@@ -72,7 +72,9 @@ the key with different workflow type, input, steps, or retry source returns `409
 code `idempotency_conflict`.
 
 New runs begin in `accepted`. Their provider correlation is `null`, proving that business
-intent exists before Temporal or another provider receives work.
+intent exists before Temporal or another provider receives work. After the creation
+event reaches `published_events`, the dispatcher reserves the stable provider correlation
+`genesis-run-<workflow_run_id>` and moves the run to `queued`.
 
 ## Run lifecycle
 
@@ -138,11 +140,28 @@ Successful operations emit:
 Domain records, correlated audit records, and their events commit together. The outbox
 publisher delivers committed events idempotently to the durable PostgreSQL event feed.
 
+## Temporal dispatch and recovery
+
+The dispatcher materializes leased `workflow_dispatches` records only from published
+`genesis.workflow_run.created` and `genesis.workflow_run.retry_created` events. It never
+scans uncommitted or unpublished run rows as an alternate start path.
+
+Before the network call, the dispatcher atomically reserves the deterministic Temporal
+workflow ID and changes the run from `accepted` to `queued`. A process restart at that
+point leaves a recoverable pending dispatch. If the process stops after Temporal accepts
+the start but before PostgreSQL acknowledges it, a replacement retries the same workflow
+ID. Temporal rejects the duplicate start, which the dispatcher treats as confirmation
+of the original start before marking the dispatch complete.
+
+Claims expire for safe takeover, failures use bounded exponential backoff, and terminal
+runs that were never dispatched are marked skipped. The dispatcher publishes a persisted
+heartbeat used by container and API readiness checks.
+
 ## Current boundary
 
-These endpoints do not yet start Temporal workflows or automatically evaluate budgets.
-They do write audit and outbox records atomically, publish committed events through the
-outbox worker, and enforce organization authorization. Explicit evaluation and decision
-operations are available through the
+These endpoints do not start Temporal directly or automatically evaluate budgets. They
+write audit and outbox records atomically, publish committed events through the outbox
+worker, dispatch those events through the recovery-safe Temporal boundary, and enforce
+organization authorization. Explicit evaluation and decision operations are available through the
 [Cost Governance API](cost-governance-api.md); automatic workflow admission based on
 those records remains a later integration slice.

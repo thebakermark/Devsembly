@@ -277,9 +277,22 @@ Completed in the audit and event-publication slice:
 5. Added PostgreSQL idempotency, backoff, crash-recovery, heartbeat, audit-atomicity,
    migration, Compose, and live-stack validation.
 
+Completed in the Temporal dispatch slice:
+
+1. Added a durable consumer of committed workflow-run events from `published_events`.
+2. Added stable Temporal workflow IDs, leased dispatch claims, bounded retry scheduling,
+   and duplicate-start reconciliation through Temporal workflow-ID uniqueness.
+3. Added an atomic PostgreSQL reservation that moves accepted runs to queued before the
+   network call, preserving recovery when either PostgreSQL or the dispatcher restarts.
+4. Added a provider-neutral committed-run Temporal workflow boundary, dispatcher
+   heartbeat, container health check, and API readiness reporting.
+5. Added PostgreSQL publication-gating, retry, lease takeover, post-start crash recovery,
+   duplicate-prevention, migration, Compose, and live-stack validation.
+
 Next:
 
-1. Dispatch committed workflow runs to Temporal and add restart-recovery tests.
-2. Connect workflow admission to cost evaluation and decision state.
-3. Add actual usage ingestion, adaptive forecasting, and the first complete
+1. Connect workflow admission to cost evaluation and decision state.
+2. Add actual usage ingestion, adaptive forecasting, and the first complete
    end-to-end `$50/month` acceptance scenario.
+3. Connect Temporal workflow signals and activities to persisted step attempts,
+   cancellation, provider execution, and evidence.

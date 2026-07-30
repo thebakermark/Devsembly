@@ -28,6 +28,7 @@ from devsembly.identity_api import router as identity_router
 from devsembly.outbox_publisher import worker_readiness
 from devsembly.workflow_api import internal_router as workflow_internal_router
 from devsembly.workflow_api import router as workflow_router
+from devsembly.workflow_dispatcher import WORKER_NAME as DISPATCHER_WORKER_NAME
 
 app = FastAPI(title="Devsembly Factory API", version="0.1.0")
 app.include_router(genesis_router)
@@ -175,6 +176,14 @@ async def readiness() -> dict[str, str]:
         checks["outbox_publisher"] = "ok" if outbox_status["ready"] is True else "unavailable"
     except Exception as exc:  # noqa: BLE001 - readiness reports dependency failures
         checks["outbox_publisher"] = f"unavailable: {type(exc).__name__}"
+
+    try:
+        dispatcher_status = await worker_readiness(worker_name=DISPATCHER_WORKER_NAME)
+        checks["temporal_dispatcher"] = (
+            "ok" if dispatcher_status["ready"] is True else "unavailable"
+        )
+    except Exception as exc:  # noqa: BLE001 - readiness reports dependency failures
+        checks["temporal_dispatcher"] = f"unavailable: {type(exc).__name__}"
 
     if any(value != "ok" for value in checks.values()):
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=checks)

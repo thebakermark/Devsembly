@@ -232,11 +232,12 @@ class OutboxWorker:
 async def worker_readiness(
     session_factory: async_sessionmaker[AsyncSession] = SessionFactory,
     *,
+    worker_name: str = WORKER_NAME,
     max_age_seconds: int = 30,
     clock: Clock = _utc_now,
 ) -> dict[str, object]:
     async with session_factory() as session:
-        heartbeat = await session.get(models.WorkerHeartbeat, WORKER_NAME)
+        heartbeat = await session.get(models.WorkerHeartbeat, worker_name)
     if heartbeat is None:
         return {"ready": False, "reason": "missing"}
     age_seconds = max(0.0, (clock() - heartbeat.last_seen_at).total_seconds())

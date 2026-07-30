@@ -99,6 +99,8 @@ services:
         condition: service_started
       event-publisher:
         condition: service_healthy
+      temporal-dispatcher:
+        condition: service_healthy
     environment:
       DEVSEMBLY_TEMPORAL_ADDRESS: temporal:7233
       DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-devsembly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-devsembly}
@@ -138,6 +140,30 @@ services:
       retries: 20
     networks: [control-plane]
 
+  temporal-dispatcher:
+    build: .
+    restart: unless-stopped
+    command: python -m devsembly.workflow_dispatcher
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      temporal:
+        condition: service_healthy
+      event-publisher:
+        condition: service_healthy
+    environment:
+      DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-devsembly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-devsembly}
+      DEVSEMBLY_TEMPORAL_ADDRESS: temporal:7233
+      DEVSEMBLY_TEMPORAL_TASK_QUEUE: ${DEVSEMBLY_TEMPORAL_TASK_QUEUE:-devsembly-factory}
+      DEVSEMBLY_DISPATCH_POLL_SECONDS: ${DEVSEMBLY_DISPATCH_POLL_SECONDS:-1}
+      DEVSEMBLY_DISPATCH_HEALTH_MAX_AGE_SECONDS: ${DEVSEMBLY_DISPATCH_HEALTH_MAX_AGE_SECONDS:-30}
+    healthcheck:
+      test: ["CMD", "python", "-m", "devsembly.workflow_dispatcher", "--healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [control-plane]
+
   worker:
     build: .
     restart: unless-stopped
@@ -149,6 +175,7 @@ services:
         condition: service_healthy
     environment:
       DEVSEMBLY_TEMPORAL_ADDRESS: temporal:7233
+      DEVSEMBLY_TEMPORAL_TASK_QUEUE: ${DEVSEMBLY_TEMPORAL_TASK_QUEUE:-devsembly-factory}
       DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-devsembly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-devsembly}
       DEVSEMBLY_REDIS_URL: redis://redis:6379/0
       DEVSEMBLY_OBJECT_STORE_ENDPOINT: http://minio:9000
