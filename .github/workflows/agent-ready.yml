@@ -1,0 +1,34 @@
+name: Agent-ready intake
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  acknowledge:
+    if: github.event.label.name == 'agent-ready'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = [
+              'This issue has entered the Devsembly agent work queue.',
+              '',
+              'Before an agent starts, confirm that:',
+              '- acceptance criteria are testable;',
+              '- dependencies and blockers are resolved;',
+              '- required permissions and data access are explicit;',
+              '- the resulting pull request will receive human review.'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body
+            });
