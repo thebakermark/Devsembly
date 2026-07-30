@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from devsembly.database import SessionFactory
 from devsembly.repositories import (
     BudgetRepository,
+    CostEvaluationRepository,
+    DecisionRepository,
     InitiativeRepository,
     OrganizationRepository,
     OutboxRepository,
@@ -18,6 +20,8 @@ from devsembly.repositories import (
 )
 from devsembly.sqlalchemy_repositories import (
     SqlAlchemyBudgetRepository,
+    SqlAlchemyCostEvaluationRepository,
+    SqlAlchemyDecisionRepository,
     SqlAlchemyInitiativeRepository,
     SqlAlchemyOrganizationRepository,
     SqlAlchemyOutboxRepository,
@@ -40,6 +44,12 @@ class UnitOfWork(Protocol):
 
     @property
     def budgets(self) -> BudgetRepository: ...
+
+    @property
+    def cost_evaluations(self) -> CostEvaluationRepository: ...
+
+    @property
+    def decisions(self) -> DecisionRepository: ...
 
     @property
     def workflow_runs(self) -> WorkflowRunRepository: ...
@@ -96,6 +106,14 @@ class SqlAlchemyUnitOfWork:
     @property
     def budgets(self) -> BudgetRepository:
         return SqlAlchemyBudgetRepository(self._active_session())
+
+    @property
+    def cost_evaluations(self) -> CostEvaluationRepository:
+        return SqlAlchemyCostEvaluationRepository(self._active_session())
+
+    @property
+    def decisions(self) -> DecisionRepository:
+        return SqlAlchemyDecisionRepository(self._active_session())
 
     @property
     def workflow_runs(self) -> WorkflowRunRepository:

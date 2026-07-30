@@ -24,7 +24,7 @@ validation. Status describes documentation completion, not runtime implementatio
 | Organizational canonical models | [Book VI](book-6-organizational-genome.md) | Existing Organizational Genome schemas | JSON Schema checks |
 | Provider contracts | [Provider SDK](provider-sdk/README.md) | Contract specifications and examples | Schema and conformance checks |
 | Current versus future scope | [Book II](book-2-architecture.md) | [Genesis plan](../implementation/genesis-reference-implementation-plan.md) | Architecture review |
-| `$50/month` constraint | [Book I](book-1-constitution.md) | Genesis plan and operations manual | Budget acceptance test, planned |
+| `$50/month` constraint | [Book I](book-1-constitution.md) | [Cost Governance API v1](cost-governance-api.md) | API and PostgreSQL budget evaluation tests |
 | Organization registry runtime | [Book VI](book-6-organizational-genome.md) | [Registry API v1](api-reference.md) | API and PostgreSQL integration tests |
 | Repository and Unit of Work runtime | [Book III](book-3-engineering-standards.md) | [ADR 0004](../architecture/decisions/0004-postgresql-persistence-contracts.md) | Transaction, rollback, and concurrency tests |
 | Initiative and project isolation | [ADR 0007](../architecture/decisions/0007-organizations-before-applications.md) | [Registry API v1](api-reference.md) | Parent-path isolation tests |
@@ -34,6 +34,10 @@ validation. Status describes documentation completion, not runtime implementatio
 | Workflow lifecycle and concurrency | [Book III](book-3-engineering-standards.md) | [Workflow Run API v1](workflow-run-api.md) | Transition, stale-version, cancellation, and terminal-state tests |
 | Workflow retry lineage | [Workflow engine](kernel/workflow-engine.md) | [Workflow Run API v1](workflow-run-api.md) | Retry isolation and idempotency tests |
 | Workflow step evidence | [Book V](book-5-agent-handbook.md) | [Workflow Run API v1](workflow-run-api.md) | Attempt ordering, payload, transaction, and outbox tests |
+| Fixed-precision cost evaluation | Genesis plan | [Cost Governance API v1](cost-governance-api.md) | Decimal derivation and database-math constraints |
+| Budget enforcement modes | [Book IV](book-4-operations-manual.md) | [Cost Governance API v1](cost-governance-api.md) | Observe, warn, block, and budget-revision tests |
+| Lower-cost recommendation | Genesis plan | [Cost Governance API v1](cost-governance-api.md) | Deterministic compliant-option selection tests |
+| Material decision history | [ADR 0013](../architecture/decisions/0013-human-authority-final.md) | [Cost Governance API v1](cost-governance-api.md) | Proposal, resolution, concurrency, and finality tests |
 
 ## Maintenance
 

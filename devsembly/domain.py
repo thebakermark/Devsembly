@@ -29,6 +29,31 @@ class BudgetEnforcementMode(StrEnum):
     BLOCK = "block"
 
 
+class CostCadence(StrEnum):
+    ONE_TIME = "one_time"
+    MONTHLY = "monthly"
+
+
+class CostEvaluationOutcome(StrEnum):
+    WITHIN_BUDGET = "within_budget"
+    OBSERVED_OVERAGE = "observed_overage"
+    APPROVAL_REQUIRED = "approval_required"
+    BLOCKED = "blocked"
+
+
+class DecisionStatus(StrEnum):
+    PROPOSED = "proposed"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class DecisionRisk(StrEnum):
+    LOW = "low"
+    MODERATE = "moderate"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
 class WorkflowRunStatus(StrEnum):
     ACCEPTED = "accepted"
     QUEUED = "queued"
@@ -95,6 +120,91 @@ class Budget:
     currency: str
     enforcement_mode: BudgetEnforcementMode
     version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class CostLineItem:
+    category: str
+    description: str
+    cadence: CostCadence
+    quantity: Decimal
+    unit_cost: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class CostOptionDefinition:
+    key: str
+    name: str
+    satisfies_acceptance_criteria: bool
+    line_items: tuple[CostLineItem, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class CostOption:
+    key: str
+    name: str
+    satisfies_acceptance_criteria: bool
+    line_items: tuple[CostLineItem, ...]
+    one_time_cost: Decimal
+    monthly_cost: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class CostRecommendation:
+    option_key: str
+    monthly_savings: Decimal
+    one_time_savings: Decimal
+    fits_monthly_budget: bool
+    rationale: str
+    algorithm_version: str
+
+
+@dataclass(frozen=True, slots=True)
+class CostEvaluation:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    budget_id: uuid.UUID
+    workflow_run_id: uuid.UUID | None
+    idempotency_key: str
+    request_fingerprint: str
+    currency: str
+    budget_monthly_limit: Decimal
+    budget_version: int
+    enforcement_mode: BudgetEnforcementMode
+    selected_option: CostOption
+    alternatives: tuple[CostOption, ...]
+    outcome: CostEvaluationOutcome
+    monthly_overage: Decimal
+    recommendation: CostRecommendation | None
+    algorithm_version: str
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class Decision:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    cost_evaluation_id: uuid.UUID | None
+    title: str
+    context: str
+    selected_option: str
+    alternatives: tuple[dict[str, object], ...]
+    currency: str
+    estimated_one_time_cost: Decimal
+    estimated_monthly_cost: Decimal
+    risk: DecisionRisk
+    confidence: Decimal
+    rationale: str
+    status: DecisionStatus
+    decided_by: str | None
+    decision_note: str | None
+    outcome: str | None
+    authorization_budget_version: int | None
+    authorization_monthly_limit: Decimal | None
+    version: int
+    decided_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

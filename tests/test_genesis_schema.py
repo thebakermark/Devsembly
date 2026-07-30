@@ -8,6 +8,7 @@ def test_genesis_tables_are_registered() -> None:
         "initiatives",
         "projects",
         "budgets",
+        "cost_evaluations",
         "decisions",
         "workflow_runs",
         "workflow_steps",
@@ -35,6 +36,7 @@ def test_mutable_genesis_aggregates_use_optimistic_versions() -> None:
         "initiatives",
         "projects",
         "budgets",
+        "decisions",
         "workflow_runs",
         "workflow_steps",
     ):
@@ -64,3 +66,23 @@ def test_workflow_attempt_optional_payloads_store_sql_null() -> None:
     table = Base.metadata.tables["workflow_step_attempts"]
     assert table.c.result_payload.type.none_as_null is True
     assert table.c.error_payload.type.none_as_null is True
+
+
+def test_cost_governance_money_and_idempotency_constraints() -> None:
+    table = Base.metadata.tables["cost_evaluations"]
+    assert table.c.selected_monthly_cost.type.precision == 14
+    assert table.c.selected_monthly_cost.type.scale == 4
+    assert table.c.recommendation.type.none_as_null is True
+    assert any(
+        constraint.name == "uq_cost_evaluations_project_idempotency"
+        for constraint in table.constraints
+    )
+
+
+def test_decisions_have_final_state_and_budget_authorization_fields() -> None:
+    table = Base.metadata.tables["decisions"]
+    assert table.c.cost_evaluation_id.nullable is True
+    assert table.c.decided_at.nullable is True
+    assert table.c.authorization_budget_version.nullable is True
+    assert table.c.estimated_monthly_cost.type.precision == 14
+    assert table.c.estimated_monthly_cost.type.scale == 4

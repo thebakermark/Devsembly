@@ -42,15 +42,20 @@ The first runnable scaffold now provides:
 - versioned organization, initiative, project, and budget APIs with parent-path isolation;
 - project-scoped workflow-run APIs with durable intent, lifecycle transitions, cancellation,
   retry lineage, ordered steps, completed attempts, and idempotent creation;
+- immutable project cost evaluations with budget snapshots, fixed-precision option totals,
+  deterministic lower-cost recommendations, and observe, warn, and block outcomes;
+- proposed, approved, and rejected decision records with finality, declared human
+  provenance, budget authorization snapshots, and optimistic concurrency;
 - optimistic concurrency, database-enforced budget invariants, and atomic outbox writes;
 - PostgreSQL-backed readiness checking;
 - local PostgreSQL, Redis, MinIO, Temporal, API, worker, and migration services through Docker Compose;
 - API, domain, schema, transaction, isolation, migration, and PostgreSQL integration tests;
 - local-development and migration instructions.
 
-This proves the selected runtime, organization-to-budget persistence path, and durable
-workflow intent before provider dispatch. It does not yet complete Temporal dispatch,
-identity, forecasting, evidence, audit publication, or operator capabilities.
+This proves the selected runtime, organization-to-budget persistence path, durable
+workflow intent before provider dispatch, and explicit cost-and-decision governance. It
+does not yet complete Temporal dispatch, identity, actual usage ingestion, adaptive
+forecasting, evidence, audit publication, or operator capabilities.
 
 ## 4. Mandatory capabilities
 
@@ -151,11 +156,14 @@ Genesis v0.1 is complete when:
 - Runtime and local data-service scaffold — current
 - Organization, initiative, project, budget, decision, workflow-run, workflow-step,
   step-attempt, audit, and outbox schema — current
-- Repository, Unit of Work, organization, initiative, project, budget, workflow-run,
-  step-attempt, and outbox-write path — current
+- Repository, Unit of Work, organization, initiative, project, budget, cost-evaluation,
+  decision, workflow-run, step-attempt, and outbox-write path — current
 - Database migrations and round-trip validation — current
-- API, unit, and PostgreSQL integration tests for registry and workflow persistence — current
-- Decision, cost evaluation, audit, authorization, and expanded budget behavior — remaining
+- API, unit, and PostgreSQL integration tests for registry, cost governance, decisions,
+  and workflow persistence — current
+- Cost evaluation, deterministic budget recommendations, decision finality, and
+  transactional events — current
+- Audit, authenticated authorization, actual usage, and adaptive forecasting — remaining
 
 ### G2 — Governed workflow skeleton
 
@@ -173,10 +181,11 @@ Genesis v0.1 is complete when:
 
 ### G4 — Budget-aware execution
 
-- Cost estimate contract
-- Budget gate
-- Hard-stop and warning behavior
-- Monthly forecast and recommendation output
+- Cost estimate contract — current
+- Explicit budget evaluation and observe, warn, and hard-stop behavior — current
+- Deterministic lower-cost recommendation output — current
+- Actual usage ingestion and adaptive monthly forecast — remaining
+- Automatic governed-workflow admission and escalation — remaining
 
 ### G5 — Operator control surface
 
@@ -227,12 +236,22 @@ Completed in the issue #22 slice:
 4. Removed the direct unpersisted Temporal start API.
 5. Added workflow migration, API, PostgreSQL, transition, isolation, and outbox tests.
 
+Completed in the issue #23 slice:
+
+1. Added immutable provider-neutral cost evaluations with budget and algorithm snapshots.
+2. Derived one-time and monthly totals from decimal line items.
+3. Added observe, warn, block, budget-revision, and acceptance-criteria approval guards.
+4. Added deterministic lower-cost recommendations with preserved rationale.
+5. Added proposed and final decision APIs with concurrency, finality, declared human
+   provenance, and transactional outbox events.
+6. Added migration, OpenAPI, isolation, idempotency, PostgreSQL, and `$50/month` tests.
+
 Next:
 
-1. Add cost estimates, budget evaluation, lower-cost recommendations, and decision-record
-   APIs.
-2. Add OIDC authentication and organization-scoped authorization.
-3. Add evidence metadata and a MinIO provider adapter.
-4. Add audit writers and an idempotent outbox publisher worker.
-5. Dispatch committed workflow runs to Temporal and add restart-recovery tests.
-6. Add the first end-to-end `$50/month` acceptance scenario.
+1. Add OIDC authentication and organization-scoped authorization.
+2. Add evidence metadata and a MinIO provider adapter.
+3. Add audit writers and an idempotent outbox publisher worker.
+4. Dispatch committed workflow runs to Temporal and add restart-recovery tests.
+5. Connect workflow admission to cost evaluation and decision state.
+6. Add actual usage ingestion, adaptive forecasting, and the first complete
+   end-to-end `$50/month` acceptance scenario.

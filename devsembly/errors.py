@@ -42,3 +42,9 @@ class InvalidTransitionError(GenesisError):
         super().__init__(
             f"{resource} cannot transition from {current_status!r} to {target_status!r}"
         )
+
+
+class CostGovernanceError(GenesisError):
+    def __init__(self, detail: str) -> None:
+        self.detail = detail
+        super().__init__(detail)

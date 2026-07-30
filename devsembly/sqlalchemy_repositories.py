@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import cast
 
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
@@ -13,6 +14,15 @@ from devsembly import models
 from devsembly.domain import (
     Budget,
     BudgetEnforcementMode,
+    CostCadence,
+    CostEvaluation,
+    CostEvaluationOutcome,
+    CostLineItem,
+    CostOption,
+    CostRecommendation,
+    Decision,
+    DecisionRisk,
+    DecisionStatus,
     Initiative,
     InitiativeStatus,
     Organization,
@@ -26,7 +36,7 @@ from devsembly.domain import (
     WorkflowStepAttempt,
     WorkflowStepStatus,
 )
-from devsembly.errors import DuplicateResourceError, StaleVersionError
+from devsembly.errors import DuplicateResourceError, InvalidTransitionError, StaleVersionError
 
 
 def _organization(model: models.Organization) -> Organization:
@@ -73,6 +83,122 @@ def _budget(model: models.Budget) -> Budget:
         currency=model.currency,
         enforcement_mode=BudgetEnforcementMode(model.enforcement_mode),
         version=model.version,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+    )
+
+
+def _line_item_payload(item: CostLineItem) -> dict[str, object]:
+    return {
+        "category": item.category,
+        "description": item.description,
+        "cadence": item.cadence.value,
+        "quantity": str(item.quantity),
+        "unit_cost": str(item.unit_cost),
+    }
+
+
+def _option_payload(option: CostOption) -> dict[str, object]:
+    return {
+        "key": option.key,
+        "name": option.name,
+        "satisfies_acceptance_criteria": option.satisfies_acceptance_criteria,
+        "line_items": [_line_item_payload(item) for item in option.line_items],
+        "one_time_cost": str(option.one_time_cost),
+        "monthly_cost": str(option.monthly_cost),
+    }
+
+
+def _cost_option(payload: dict[str, object]) -> CostOption:
+    items = cast(list[dict[str, object]], payload["line_items"])
+    return CostOption(
+        key=str(payload["key"]),
+        name=str(payload["name"]),
+        satisfies_acceptance_criteria=bool(payload["satisfies_acceptance_criteria"]),
+        line_items=tuple(
+            CostLineItem(
+                category=str(item["category"]),
+                description=str(item["description"]),
+                cadence=CostCadence(str(item["cadence"])),
+                quantity=Decimal(str(item["quantity"])),
+                unit_cost=Decimal(str(item["unit_cost"])),
+            )
+            for item in items
+        ),
+        one_time_cost=Decimal(str(payload["one_time_cost"])),
+        monthly_cost=Decimal(str(payload["monthly_cost"])),
+    )
+
+
+def _recommendation_payload(recommendation: CostRecommendation) -> dict[str, object]:
+    return {
+        "option_key": recommendation.option_key,
+        "monthly_savings": str(recommendation.monthly_savings),
+        "one_time_savings": str(recommendation.one_time_savings),
+        "fits_monthly_budget": recommendation.fits_monthly_budget,
+        "rationale": recommendation.rationale,
+        "algorithm_version": recommendation.algorithm_version,
+    }
+
+
+def _cost_recommendation(payload: dict[str, object]) -> CostRecommendation:
+    return CostRecommendation(
+        option_key=str(payload["option_key"]),
+        monthly_savings=Decimal(str(payload["monthly_savings"])),
+        one_time_savings=Decimal(str(payload["one_time_savings"])),
+        fits_monthly_budget=bool(payload["fits_monthly_budget"]),
+        rationale=str(payload["rationale"]),
+        algorithm_version=str(payload["algorithm_version"]),
+    )
+
+
+def _cost_evaluation(model: models.CostEvaluation) -> CostEvaluation:
+    return CostEvaluation(
+        id=model.id,
+        project_id=model.project_id,
+        budget_id=model.budget_id,
+        workflow_run_id=model.workflow_run_id,
+        idempotency_key=model.idempotency_key,
+        request_fingerprint=model.request_fingerprint,
+        currency=model.currency,
+        budget_monthly_limit=model.budget_monthly_limit,
+        budget_version=model.budget_version,
+        enforcement_mode=BudgetEnforcementMode(model.enforcement_mode),
+        selected_option=_cost_option(model.selected_option),
+        alternatives=tuple(_cost_option(item) for item in model.alternatives),
+        outcome=CostEvaluationOutcome(model.outcome),
+        monthly_overage=model.monthly_overage,
+        recommendation=(
+            None if model.recommendation is None else _cost_recommendation(model.recommendation)
+        ),
+        algorithm_version=model.algorithm_version,
+        created_at=model.created_at,
+    )
+
+
+def _decision(model: models.Decision) -> Decision:
+    return Decision(
+        id=model.id,
+        project_id=model.project_id,
+        cost_evaluation_id=model.cost_evaluation_id,
+        title=model.title,
+        context=model.context,
+        selected_option=model.selected_option,
+        alternatives=tuple(model.alternatives),
+        currency=model.currency,
+        estimated_one_time_cost=model.estimated_one_time_cost,
+        estimated_monthly_cost=model.estimated_monthly_cost,
+        risk=DecisionRisk(model.risk),
+        confidence=model.confidence,
+        rationale=model.rationale,
+        status=DecisionStatus(model.status),
+        decided_by=model.decided_by,
+        decision_note=model.decision_note,
+        outcome=model.outcome,
+        authorization_budget_version=model.authorization_budget_version,
+        authorization_monthly_limit=model.authorization_monthly_limit,
+        version=model.version,
+        decided_at=model.decided_at,
         created_at=model.created_at,
         updated_at=model.updated_at,
     )
@@ -396,6 +522,174 @@ class SqlAlchemyBudgetRepository:
         if await self.get(project_id, budget_id) is None:
             return None
         raise StaleVersionError("budget", expected_version)
+
+
+class SqlAlchemyCostEvaluationRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, evaluation: CostEvaluation) -> CostEvaluation:
+        self._session.add(
+            models.CostEvaluation(
+                id=evaluation.id,
+                project_id=evaluation.project_id,
+                budget_id=evaluation.budget_id,
+                workflow_run_id=evaluation.workflow_run_id,
+                idempotency_key=evaluation.idempotency_key,
+                request_fingerprint=evaluation.request_fingerprint,
+                currency=evaluation.currency,
+                budget_monthly_limit=evaluation.budget_monthly_limit,
+                budget_version=evaluation.budget_version,
+                enforcement_mode=evaluation.enforcement_mode.value,
+                selected_option=_option_payload(evaluation.selected_option),
+                alternatives=[_option_payload(item) for item in evaluation.alternatives],
+                selected_one_time_cost=evaluation.selected_option.one_time_cost,
+                selected_monthly_cost=evaluation.selected_option.monthly_cost,
+                outcome=evaluation.outcome.value,
+                monthly_overage=evaluation.monthly_overage,
+                recommendation=(
+                    None
+                    if evaluation.recommendation is None
+                    else _recommendation_payload(evaluation.recommendation)
+                ),
+                algorithm_version=evaluation.algorithm_version,
+                created_at=evaluation.created_at,
+            )
+        )
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            raise DuplicateResourceError("cost evaluation") from exc
+        return evaluation
+
+    async def get(self, project_id: uuid.UUID, evaluation_id: uuid.UUID) -> CostEvaluation | None:
+        result = await self._session.scalars(
+            select(models.CostEvaluation).where(
+                models.CostEvaluation.id == evaluation_id,
+                models.CostEvaluation.project_id == project_id,
+            )
+        )
+        model = result.one_or_none()
+        return None if model is None else _cost_evaluation(model)
+
+    async def get_by_idempotency_key(
+        self, project_id: uuid.UUID, idempotency_key: str
+    ) -> CostEvaluation | None:
+        result = await self._session.scalars(
+            select(models.CostEvaluation).where(
+                models.CostEvaluation.project_id == project_id,
+                models.CostEvaluation.idempotency_key == idempotency_key,
+            )
+        )
+        model = result.one_or_none()
+        return None if model is None else _cost_evaluation(model)
+
+    async def list(self, project_id: uuid.UUID) -> Sequence[CostEvaluation]:
+        result = await self._session.scalars(
+            select(models.CostEvaluation)
+            .where(models.CostEvaluation.project_id == project_id)
+            .order_by(models.CostEvaluation.created_at, models.CostEvaluation.id)
+        )
+        return [_cost_evaluation(model) for model in result]
+
+
+class SqlAlchemyDecisionRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, decision: Decision) -> Decision:
+        self._session.add(
+            models.Decision(
+                id=decision.id,
+                project_id=decision.project_id,
+                cost_evaluation_id=decision.cost_evaluation_id,
+                title=decision.title,
+                context=decision.context,
+                selected_option=decision.selected_option,
+                alternatives=list(decision.alternatives),
+                currency=decision.currency,
+                estimated_one_time_cost=decision.estimated_one_time_cost,
+                estimated_monthly_cost=decision.estimated_monthly_cost,
+                risk=decision.risk.value,
+                confidence=decision.confidence,
+                rationale=decision.rationale,
+                status=decision.status.value,
+                decided_by=decision.decided_by,
+                decision_note=decision.decision_note,
+                outcome=decision.outcome,
+                authorization_budget_version=decision.authorization_budget_version,
+                authorization_monthly_limit=decision.authorization_monthly_limit,
+                version=decision.version,
+                decided_at=decision.decided_at,
+                created_at=decision.created_at,
+                updated_at=decision.updated_at,
+            )
+        )
+        await self._session.flush()
+        return decision
+
+    async def get(self, project_id: uuid.UUID, decision_id: uuid.UUID) -> Decision | None:
+        result = await self._session.scalars(
+            select(models.Decision).where(
+                models.Decision.id == decision_id,
+                models.Decision.project_id == project_id,
+            )
+        )
+        model = result.one_or_none()
+        return None if model is None else _decision(model)
+
+    async def list(self, project_id: uuid.UUID) -> Sequence[Decision]:
+        result = await self._session.scalars(
+            select(models.Decision)
+            .where(models.Decision.project_id == project_id)
+            .order_by(models.Decision.created_at, models.Decision.id)
+        )
+        return [_decision(model) for model in result]
+
+    async def resolve(
+        self,
+        project_id: uuid.UUID,
+        decision_id: uuid.UUID,
+        expected_version: int,
+        *,
+        status: str,
+        decided_by: str,
+        decision_note: str,
+        outcome: str,
+        authorization_budget_version: int | None,
+        authorization_monthly_limit: Decimal | None,
+        decided_at: datetime,
+    ) -> Decision | None:
+        result = await self._session.scalars(
+            update(models.Decision)
+            .where(
+                models.Decision.id == decision_id,
+                models.Decision.project_id == project_id,
+                models.Decision.version == expected_version,
+                models.Decision.status == DecisionStatus.PROPOSED.value,
+            )
+            .values(
+                status=status,
+                decided_by=decided_by,
+                decision_note=decision_note,
+                outcome=outcome,
+                authorization_budget_version=authorization_budget_version,
+                authorization_monthly_limit=authorization_monthly_limit,
+                version=expected_version + 1,
+                decided_at=decided_at,
+                updated_at=decided_at,
+            )
+            .returning(models.Decision)
+        )
+        model = result.one_or_none()
+        if model is not None:
+            return _decision(model)
+        current = await self.get(project_id, decision_id)
+        if current is None:
+            return None
+        if current.version != expected_version:
+            raise StaleVersionError("decision", expected_version)
+        raise InvalidTransitionError("decision", current.status.value, status)
 
 
 class SqlAlchemyWorkflowRunRepository:

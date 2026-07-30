@@ -140,6 +140,8 @@ idempotent outbox-worker capability.
 
 ## Current boundary
 
-This slice does not start Temporal workflows, publish outbox messages, evaluate budgets,
-write audit events, or grant authorization. It establishes the durable business-state
-precondition those capabilities will consume.
+These endpoints do not start Temporal workflows, publish outbox messages, automatically
+evaluate budgets, write audit events, or grant authorization. Explicit evaluation and
+decision operations are now available through the
+[Cost Governance API](cost-governance-api.md); automatic workflow admission based on
+those records remains a later integration slice.

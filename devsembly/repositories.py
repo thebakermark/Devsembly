@@ -8,6 +8,8 @@ from typing import Protocol
 
 from devsembly.domain import (
     Budget,
+    CostEvaluation,
+    Decision,
     Initiative,
     Organization,
     OutboxMessage,
@@ -87,6 +89,43 @@ class BudgetRepository(Protocol):
         currency: str,
         enforcement_mode: str,
     ) -> Budget | None: ...
+
+
+class CostEvaluationRepository(Protocol):
+    async def add(self, evaluation: CostEvaluation) -> CostEvaluation: ...
+
+    async def get(
+        self, project_id: uuid.UUID, evaluation_id: uuid.UUID
+    ) -> CostEvaluation | None: ...
+
+    async def get_by_idempotency_key(
+        self, project_id: uuid.UUID, idempotency_key: str
+    ) -> CostEvaluation | None: ...
+
+    async def list(self, project_id: uuid.UUID) -> Sequence[CostEvaluation]: ...
+
+
+class DecisionRepository(Protocol):
+    async def add(self, decision: Decision) -> Decision: ...
+
+    async def get(self, project_id: uuid.UUID, decision_id: uuid.UUID) -> Decision | None: ...
+
+    async def list(self, project_id: uuid.UUID) -> Sequence[Decision]: ...
+
+    async def resolve(
+        self,
+        project_id: uuid.UUID,
+        decision_id: uuid.UUID,
+        expected_version: int,
+        *,
+        status: str,
+        decided_by: str,
+        decision_note: str,
+        outcome: str,
+        authorization_budget_version: int | None,
+        authorization_monthly_limit: Decimal | None,
+        decided_at: datetime,
+    ) -> Decision | None: ...
 
 
 class WorkflowRunRepository(Protocol):

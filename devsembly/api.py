@@ -8,8 +8,10 @@ from fastapi.responses import JSONResponse
 from temporalio.client import Client
 
 from devsembly.contracts import FactoryRun
+from devsembly.cost_api import router as cost_router
 from devsembly.database import check_database
 from devsembly.errors import (
+    CostGovernanceError,
     DuplicateResourceError,
     IdempotencyConflictError,
     InvalidTransitionError,
@@ -24,6 +26,7 @@ app = FastAPI(title="Devsembly Factory API", version="0.1.0")
 app.include_router(genesis_router)
 app.include_router(workflow_router)
 app.include_router(workflow_internal_router)
+app.include_router(cost_router)
 
 
 @app.exception_handler(ResourceNotFoundError)
@@ -90,6 +93,18 @@ async def invalid_transition(request: Request, exc: InvalidTransitionError) -> J
             "resource": exc.resource,
             "current_status": exc.current_status,
             "target_status": exc.target_status,
+        },
+    )
+
+
+@app.exception_handler(CostGovernanceError)
+async def cost_governance_error(request: Request, exc: CostGovernanceError) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "code": "cost_governance_error",
+            "detail": str(exc),
         },
     )
 

@@ -123,20 +123,184 @@ class Budget(Timestamped, Base):
     )
 
 
-class Decision(Timestamped, Base):
-    __tablename__ = "decisions"
+class CostEvaluation(Base):
+    __tablename__ = "cost_evaluations"
+    __table_args__ = (
+        CheckConstraint(
+            "char_length(btrim(idempotency_key)) > 0",
+            name="ck_cost_evaluations_idempotency_key",
+        ),
+        CheckConstraint(
+            "request_fingerprint ~ '^[0-9a-f]{64}$'",
+            name="ck_cost_evaluations_request_fingerprint",
+        ),
+        CheckConstraint(
+            "currency ~ '^[A-Z]{3}$'",
+            name="ck_cost_evaluations_currency",
+        ),
+        CheckConstraint(
+            "budget_monthly_limit > 0",
+            name="ck_cost_evaluations_budget_limit",
+        ),
+        CheckConstraint(
+            "budget_version > 0",
+            name="ck_cost_evaluations_budget_version",
+        ),
+        CheckConstraint(
+            "enforcement_mode IN ('observe', 'warn', 'block')",
+            name="ck_cost_evaluations_enforcement_mode",
+        ),
+        CheckConstraint(
+            "outcome IN ('within_budget', 'observed_overage', 'approval_required', 'blocked')",
+            name="ck_cost_evaluations_outcome",
+        ),
+        CheckConstraint(
+            "selected_one_time_cost >= 0 AND selected_monthly_cost >= 0",
+            name="ck_cost_evaluations_selected_costs",
+        ),
+        CheckConstraint(
+            "monthly_overage >= 0",
+            name="ck_cost_evaluations_monthly_overage",
+        ),
+        CheckConstraint(
+            "monthly_overage = GREATEST(selected_monthly_cost - budget_monthly_limit, 0)",
+            name="ck_cost_evaluations_overage_math",
+        ),
+        CheckConstraint(
+            "(outcome = 'within_budget' AND selected_monthly_cost <= budget_monthly_limit) "
+            "OR (outcome = 'observed_overage' AND enforcement_mode = 'observe' "
+            "AND selected_monthly_cost > budget_monthly_limit) "
+            "OR (outcome = 'approval_required' AND enforcement_mode = 'warn' "
+            "AND selected_monthly_cost > budget_monthly_limit) "
+            "OR (outcome = 'blocked' AND enforcement_mode = 'block' "
+            "AND selected_monthly_cost > budget_monthly_limit)",
+            name="ck_cost_evaluations_outcome_math",
+        ),
+        CheckConstraint(
+            "char_length(btrim(algorithm_version)) > 0",
+            name="ck_cost_evaluations_algorithm_version",
+        ),
+        UniqueConstraint(
+            "project_id",
+            "idempotency_key",
+            name="uq_cost_evaluations_project_idempotency",
+        ),
+        Index("ix_cost_evaluations_project_created", "project_id", "created_at"),
+        Index("ix_cost_evaluations_budget_id", "budget_id"),
+        Index("ix_cost_evaluations_workflow_run_id", "workflow_run_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
     )
-    title: Mapped[str] = mapped_column(String(250), nullable=False)
-    context: Mapped[str] = mapped_column(Text, nullable=False)
-    selected_option: Mapped[str] = mapped_column(Text, nullable=False)
-    estimated_monthly_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    budget_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("budgets.id", ondelete="RESTRICT"), nullable=False
+    )
+    workflow_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workflow_runs.id", ondelete="SET NULL")
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(200), nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    budget_monthly_limit: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    budget_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    enforcement_mode: Mapped[str] = mapped_column(String(20), nullable=False)
+    selected_option: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
     alternatives: Mapped[list[dict[str, object]]] = mapped_column(
         JSONB, default=list, nullable=False
     )
+    selected_one_time_cost: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    selected_monthly_cost: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    outcome: Mapped[str] = mapped_column(String(40), nullable=False)
+    monthly_overage: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    recommendation: Mapped[dict[str, object] | None] = mapped_column(JSONB(none_as_null=True))
+    algorithm_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class Decision(Timestamped, Base):
+    __tablename__ = "decisions"
+    __table_args__ = (
+        CheckConstraint("char_length(btrim(title)) > 0", name="ck_decisions_title"),
+        CheckConstraint("char_length(btrim(context)) > 0", name="ck_decisions_context"),
+        CheckConstraint(
+            "char_length(btrim(selected_option)) > 0",
+            name="ck_decisions_selected_option",
+        ),
+        CheckConstraint("currency ~ '^[A-Z]{3}$'", name="ck_decisions_currency"),
+        CheckConstraint(
+            "estimated_one_time_cost >= 0 AND estimated_monthly_cost >= 0",
+            name="ck_decisions_estimated_costs",
+        ),
+        CheckConstraint(
+            "risk IN ('low', 'moderate', 'high', 'critical')",
+            name="ck_decisions_risk",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_decisions_confidence",
+        ),
+        CheckConstraint("char_length(btrim(rationale)) > 0", name="ck_decisions_rationale"),
+        CheckConstraint(
+            "status IN ('proposed', 'approved', 'rejected')",
+            name="ck_decisions_status",
+        ),
+        CheckConstraint(
+            "(status = 'proposed' AND decided_by IS NULL AND decision_note IS NULL "
+            "AND outcome IS NULL AND decided_at IS NULL "
+            "AND authorization_budget_version IS NULL "
+            "AND authorization_monthly_limit IS NULL) OR "
+            "(status IN ('approved', 'rejected') "
+            "AND char_length(btrim(decided_by)) > 0 "
+            "AND char_length(btrim(decision_note)) > 0 "
+            "AND char_length(btrim(outcome)) > 0 AND decided_at IS NOT NULL)",
+            name="ck_decisions_lifecycle",
+        ),
+        CheckConstraint(
+            "authorization_budget_version IS NULL OR authorization_budget_version > 0",
+            name="ck_decisions_authorization_budget_version",
+        ),
+        CheckConstraint(
+            "authorization_monthly_limit IS NULL OR authorization_monthly_limit > 0",
+            name="ck_decisions_authorization_monthly_limit",
+        ),
+        CheckConstraint("version > 0", name="ck_decisions_version"),
+        Index("ix_decisions_project_status", "project_id", "status"),
+        Index("ix_decisions_cost_evaluation_id", "cost_evaluation_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    cost_evaluation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cost_evaluations.id", ondelete="RESTRICT")
+    )
+    title: Mapped[str] = mapped_column(String(250), nullable=False)
+    context: Mapped[str] = mapped_column(Text, nullable=False)
+    selected_option: Mapped[str] = mapped_column(Text, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    estimated_one_time_cost: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    estimated_monthly_cost: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    alternatives: Mapped[list[dict[str, object]]] = mapped_column(
+        JSONB, default=list, nullable=False
+    )
+    risk: Mapped[str] = mapped_column(String(20), nullable=False)
+    confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="proposed", nullable=False)
+    decided_by: Mapped[str | None] = mapped_column(String(255))
+    decision_note: Mapped[str | None] = mapped_column(Text)
+    outcome: Mapped[str | None] = mapped_column(Text)
+    authorization_budget_version: Mapped[int | None] = mapped_column(Integer)
+    authorization_monthly_limit: Mapped[Decimal | None] = mapped_column(Numeric(14, 4))
+    version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=text("1"), nullable=False
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class WorkflowRun(Timestamped, Base):

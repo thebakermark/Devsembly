@@ -134,6 +134,11 @@ deployment targets `$50/month`; optional services must remain disabled or self-h
 when they would exceed the approved limit. Increasing a budget requires explicit human
 authority and a decision record.
 
+The current [Cost Governance API](cost-governance-api.md) evaluates declared estimates
+and preserves recommendation and decision provenance. It does not yet replace provider
+billing reconciliation or actual-usage monitoring. Operators MUST distinguish estimates
+from observed spend until those ingestion adapters are implemented.
+
 ## Change management
 
 Every change MUST have a work item, risk and impact classification, validation plan,

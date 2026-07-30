@@ -81,6 +81,11 @@ Project-scoped workflow execution intent uses the separate
 [Workflow Run API v1](workflow-run-api.md). It reuses these transaction and isolation
 contracts before any Temporal dispatch can occur.
 
+Project budgets feed the separate
+[Cost Governance API v1](cost-governance-api.md), which snapshots budget versions,
+evaluates supplied cost options, recommends compliant lower-cost alternatives, and
+preserves final decision records.
+
 ## Current security boundary
 
 Parent-path validation and repository scoping enforce object isolation. Authentication,

@@ -9,6 +9,8 @@ from typing import Self
 
 from devsembly.domain import (
     Budget,
+    CostEvaluation,
+    Decision,
     Initiative,
     Organization,
     OutboxMessage,
@@ -17,7 +19,7 @@ from devsembly.domain import (
     WorkflowStep,
     WorkflowStepAttempt,
 )
-from devsembly.errors import DuplicateResourceError, StaleVersionError
+from devsembly.errors import DuplicateResourceError, InvalidTransitionError, StaleVersionError
 
 
 @dataclass
@@ -26,6 +28,8 @@ class MemoryStore:
     initiatives: dict[uuid.UUID, Initiative] = field(default_factory=dict)
     projects: dict[uuid.UUID, Project] = field(default_factory=dict)
     budgets: dict[uuid.UUID, Budget] = field(default_factory=dict)
+    cost_evaluations: dict[uuid.UUID, CostEvaluation] = field(default_factory=dict)
+    decisions: dict[uuid.UUID, Decision] = field(default_factory=dict)
     workflow_runs: dict[uuid.UUID, WorkflowRun] = field(default_factory=dict)
     workflow_steps: dict[uuid.UUID, WorkflowStep] = field(default_factory=dict)
     workflow_step_attempts: dict[uuid.UUID, WorkflowStepAttempt] = field(default_factory=dict)
@@ -200,6 +204,98 @@ class MemoryBudgetRepository:
         return updated
 
 
+class MemoryCostEvaluationRepository:
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def add(self, evaluation: CostEvaluation) -> CostEvaluation:
+        if any(
+            item.project_id == evaluation.project_id
+            and item.idempotency_key == evaluation.idempotency_key
+            for item in self.store.cost_evaluations.values()
+        ):
+            raise DuplicateResourceError("cost evaluation")
+        self.store.cost_evaluations[evaluation.id] = evaluation
+        return evaluation
+
+    async def get(self, project_id: uuid.UUID, evaluation_id: uuid.UUID) -> CostEvaluation | None:
+        evaluation = self.store.cost_evaluations.get(evaluation_id)
+        if evaluation is None or evaluation.project_id != project_id:
+            return None
+        return evaluation
+
+    async def get_by_idempotency_key(
+        self, project_id: uuid.UUID, idempotency_key: str
+    ) -> CostEvaluation | None:
+        return next(
+            (
+                item
+                for item in self.store.cost_evaluations.values()
+                if item.project_id == project_id and item.idempotency_key == idempotency_key
+            ),
+            None,
+        )
+
+    async def list(self, project_id: uuid.UUID) -> list[CostEvaluation]:
+        return [
+            item for item in self.store.cost_evaluations.values() if item.project_id == project_id
+        ]
+
+
+class MemoryDecisionRepository:
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def add(self, decision: Decision) -> Decision:
+        self.store.decisions[decision.id] = decision
+        return decision
+
+    async def get(self, project_id: uuid.UUID, decision_id: uuid.UUID) -> Decision | None:
+        decision = self.store.decisions.get(decision_id)
+        if decision is None or decision.project_id != project_id:
+            return None
+        return decision
+
+    async def list(self, project_id: uuid.UUID) -> list[Decision]:
+        return [item for item in self.store.decisions.values() if item.project_id == project_id]
+
+    async def resolve(
+        self,
+        project_id: uuid.UUID,
+        decision_id: uuid.UUID,
+        expected_version: int,
+        *,
+        status: str,
+        decided_by: str,
+        decision_note: str,
+        outcome: str,
+        authorization_budget_version: int | None,
+        authorization_monthly_limit: Decimal | None,
+        decided_at: datetime,
+    ) -> Decision | None:
+        current = await self.get(project_id, decision_id)
+        if current is None:
+            return None
+        if current.version != expected_version:
+            raise StaleVersionError("decision", expected_version)
+        if current.status.value != "proposed":
+            raise InvalidTransitionError("decision", current.status.value, status)
+        updated = replace(
+            current,
+            status=type(current.status)(status),
+            decided_by=decided_by,
+            decision_note=decision_note,
+            outcome=outcome,
+            authorization_budget_version=authorization_budget_version,
+            authorization_monthly_limit=authorization_monthly_limit,
+            version=expected_version + 1,
+            decided_at=decided_at,
+            updated_at=decided_at,
+        )
+        self.store.decisions[decision_id] = updated
+        return updated
+
+
 class MemoryWorkflowRunRepository:
     def __init__(self, store: MemoryStore) -> None:
         self.store = store
@@ -365,6 +461,8 @@ class MemoryUnitOfWork:
         self.initiatives = MemoryInitiativeRepository(store)
         self.projects = MemoryProjectRepository(store)
         self.budgets = MemoryBudgetRepository(store)
+        self.cost_evaluations = MemoryCostEvaluationRepository(store)
+        self.decisions = MemoryDecisionRepository(store)
         self.workflow_runs = MemoryWorkflowRunRepository(store)
         self.workflow_steps = MemoryWorkflowStepRepository(store)
         self.workflow_step_attempts = MemoryWorkflowStepAttemptRepository(store)
