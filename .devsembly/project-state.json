@@ -380,7 +380,7 @@
         "title": "Governed delivery loop local gates",
         "status": "passed",
         "kind": "validation-suite",
-        "evidence_ids": ["evidence:local-issue-33"],
+        "evidence_ids": ["evidence:ci-74"],
         "acceptance_criterion_ids": ["criterion:issue-33-control-plane-slice"],
         "affected_capability_ids": ["capability:project-intelligence"],
         "provenance": {
@@ -392,9 +392,9 @@
           "observed_at": "2026-07-31T23:50:00Z"
         },
         "confidence": {
-          "score": 0.8,
+          "score": 1.0,
           "status": "verified",
-          "explanation": "Canonical state validation, Ruff, format, strict MyPy, 60 tests, Alembic single-head and offline SQL, Markdown lint, and link checks pass. PostgreSQL, Docker, Compose, and live provider execution await CI or the development host."
+          "explanation": "Control Plane CI #74 passed canonical-state validation, Ruff, format, strict MyPy, Markdown, PostgreSQL tests, migration round-trip and model parity, Docker/Compose builds, and live-stack health. A live external-provider fixture run remains the milestone proof."
         }
       },
       {
