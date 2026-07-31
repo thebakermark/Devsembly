@@ -28,9 +28,9 @@ completed_capabilities:
   - project-state-schema
   - immutable-project-state-revisions
 validation:
-  latest_head: d74e33f
-  latest_ci_run: 47
-  status: local-passed-awaiting-pie-ci
+  latest_head: 3554ee9b29d8ce3785c80eef76fcce20bbeac223
+  latest_ci_run: 48
+  status: passed
 open_issues:
   milestone: 32
   epic: 31
