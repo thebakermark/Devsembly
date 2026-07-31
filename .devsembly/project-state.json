@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0",
+  "project": {
+    "id": "project:devsembly",
+    "name": "Devsembly Genesis",
+    "repository": "thebakermark/Devsembly",
+    "status": "active"
+  },
+  "vision": {
+    "text": "Build a governed AI Work Operating System that supplies CompanyOS projects with durable, auditable execution and shared intelligence.",
+    "provenance": {
+      "provider": "repository",
+      "kind": "genesis-constitution",
+      "external_id": "docs/genesis/book-1-constitution/README.md",
+      "uri": null,
+      "occurred_at": null,
+      "observed_at": "2026-07-31T00:00:00Z"
+    },
+    "confidence": {
+      "score": 1.0,
+      "status": "verified",
+      "explanation": "The repository's accepted Genesis Constitution is authoritative."
+    }
+  },
+  "requirements": [],
+  "architecture": {
+    "summary": {
+      "text": "Python and FastAPI modular monolith with PostgreSQL, Temporal, MinIO, Redis, external OIDC, transactional outbox, audit, evidence, and policy-governed workflows.",
+      "provenance": {
+        "provider": "repository",
+        "kind": "accepted-architecture",
+        "external_id": "docs/architecture/system-architecture.md",
+        "uri": null,
+        "occurred_at": null,
+        "observed_at": "2026-07-31T00:00:00Z"
+      },
+      "confidence": {
+        "score": 1.0,
+        "status": "verified",
+        "explanation": "The architecture document and accepted ADRs agree."
+      }
+    },
+    "decisions": [],
+    "components": []
+  },
+  "graphs": {
+    "capabilities": { "nodes": [], "edges": [] },
+    "dependencies": { "nodes": [], "edges": [] }
+  },
+  "planning": {
+    "roadmap": [],
+    "milestones": [],
+    "epics": [],
+    "features": [],
+    "tasks": [],
+    "current_sprint": null
+  },
+  "validation": {
+    "status": "passed",
+    "results": []
+  },
+  "economics": {
+    "currency": "USD",
+    "monthly_budget": 50.0,
+    "token_usage": 0,
+    "actual_cost": 0.0,
+    "forecast_cost": 0.0
+  },
+  "risks": [],
+  "technical_debt": [],
+  "memory": [],
+  "recommendations": [],
+  "forecast": {
+    "completion": null,
+    "confidence": {
+      "score": 0.0,
+      "status": "inferred",
+      "explanation": "No calibrated delivery history is available for a completion forecast."
+    }
+  }
+}

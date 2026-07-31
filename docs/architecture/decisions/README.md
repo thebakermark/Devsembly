@@ -30,6 +30,7 @@ Each ADR records status, date, context, decision, alternatives, consequences, bu
 | [0011](0011-capability-based-architecture.md) | Capability-based architecture | Accepted |
 | [0012](0012-github-is-a-provider.md) | GitHub is a provider | Accepted |
 | [0013](0013-human-authority-final.md) | Human authority is final | Accepted |
+| [0014](0014-project-intelligence-canonical-revisions.md) | Project Intelligence uses canonical immutable revisions | Accepted |
 
 ADRs are immutable after acceptance except for status and links to superseding decisions. Material changes require a new ADR.
 

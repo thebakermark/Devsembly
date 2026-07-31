@@ -7,6 +7,7 @@
 |---|---|
 | [Provider manifest](provider-manifest.schema.json) | Provider identity, capabilities, configuration, authentication, lifecycle, events, operations, and conformance |
 | [Capability definition](capability-definition.schema.json) | Provider-independent capability ownership, operations, policy, service, cost, and evidence |
+| [Project Intelligence state](project-intelligence-state.schema.json) | Canonical vision, architecture, graph, plan, validation, economics, risk, memory, recommendation, and forecast bootstrap state |
 
 Organizational Genome schemas remain canonical under
 [`docs/architecture/organizational-genome/schemas/`](../../architecture/organizational-genome/README.md).

@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devsembly.dev/schemas/project-intelligence-state-1.0.json",
+  "title": "Devsembly Project Intelligence State",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "project",
+    "vision",
+    "requirements",
+    "architecture",
+    "graphs",
+    "planning",
+    "validation",
+    "economics",
+    "risks",
+    "technical_debt",
+    "memory",
+    "recommendations",
+    "forecast"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "repository", "status"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "name": { "$ref": "#/$defs/nonEmpty" },
+        "repository": { "$ref": "#/$defs/nonEmpty" },
+        "status": { "enum": ["planned", "active", "blocked", "completed", "cancelled"] }
+      }
+    },
+    "vision": { "$ref": "#/$defs/assertedText" },
+    "requirements": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+    "architecture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "decisions", "components"],
+      "properties": {
+        "summary": { "$ref": "#/$defs/assertedText" },
+        "decisions": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+        "components": { "type": "array", "items": { "$ref": "#/$defs/item" } }
+      }
+    },
+    "graphs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capabilities", "dependencies"],
+      "properties": {
+        "capabilities": { "$ref": "#/$defs/graph" },
+        "dependencies": { "$ref": "#/$defs/graph" }
+      }
+    },
+    "planning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["roadmap", "milestones", "epics", "features", "tasks", "current_sprint"],
+      "properties": {
+        "roadmap": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+        "milestones": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+        "epics": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+        "features": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+        "tasks": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+        "current_sprint": { "anyOf": [{ "$ref": "#/$defs/item" }, { "type": "null" }] }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "results"],
+      "properties": {
+        "status": { "enum": ["unknown", "pending", "passed", "failed", "partial"] },
+        "results": { "type": "array", "items": { "$ref": "#/$defs/item" } }
+      }
+    },
+    "economics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "monthly_budget", "token_usage", "actual_cost", "forecast_cost"],
+      "properties": {
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "monthly_budget": { "type": ["number", "null"], "minimum": 0 },
+        "token_usage": { "type": "integer", "minimum": 0 },
+        "actual_cost": { "type": "number", "minimum": 0 },
+        "forecast_cost": { "type": "number", "minimum": 0 }
+      }
+    },
+    "risks": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+    "technical_debt": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+    "memory": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+    "recommendations": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+    "forecast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["completion", "confidence"],
+      "properties": {
+        "completion": { "type": ["string", "null"] },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    }
+  },
+  "$defs": {
+    "nonEmpty": { "type": "string", "minLength": 1 },
+    "stableId": { "type": "string", "pattern": "^[a-z][a-z0-9-]*:[A-Za-z0-9._/-]+$" },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "kind", "observed_at"],
+      "properties": {
+        "provider": { "$ref": "#/$defs/nonEmpty" },
+        "kind": { "$ref": "#/$defs/nonEmpty" },
+        "external_id": { "type": ["string", "null"] },
+        "uri": { "type": ["string", "null"] },
+        "occurred_at": { "type": ["string", "null"], "format": "date-time" },
+        "observed_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "status", "explanation"],
+      "properties": {
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "status": { "enum": ["verified", "inferred", "disputed"] },
+        "explanation": { "$ref": "#/$defs/nonEmpty" }
+      }
+    },
+    "assertedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "provenance", "confidence"],
+      "properties": {
+        "text": { "$ref": "#/$defs/nonEmpty" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "title", "status", "provenance", "confidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "title": { "$ref": "#/$defs/nonEmpty" },
+        "status": { "$ref": "#/$defs/nonEmpty" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "type", "provenance", "confidence"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "from": { "$ref": "#/$defs/stableId" },
+        "to": { "$ref": "#/$defs/stableId" },
+        "type": { "$ref": "#/$defs/nonEmpty" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodes", "edges"],
+      "properties": {
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } }
+      }
+    }
+  }
+}
