@@ -319,7 +319,7 @@
       {
         "id": "task:pie-29",
         "title": "Governed MemoryOS project context",
-        "status": "active",
+        "status": "completed",
         "parent_id": "epic:project-intelligence",
         "provenance": {
           "provider": "github",
@@ -330,9 +330,9 @@
           "observed_at": "2026-07-31T23:00:00Z"
         },
         "confidence": {
-          "score": 0.8,
+          "score": 1.0,
           "status": "verified",
-          "explanation": "Typed memory proposals, approval, deterministic context assembly, retention and sensitivity filters, invalidation, persistence, and local tests are implemented; full CI remains pending."
+          "explanation": "Issue #29 is complete: typed memory proposals, approval, deterministic context assembly, retention and sensitivity filters, invalidation, persistence, and full Control Plane CI #63 passed."
         },
         "aliases": [{
           "provider": "github",
@@ -353,7 +353,7 @@
         "title": "Memory and Context API local gates",
         "status": "passed",
         "kind": "validation-suite",
-        "evidence_ids": ["evidence:local-issue-29"],
+        "evidence_ids": ["evidence:ci-63"],
         "acceptance_criterion_ids": ["criterion:issue-29"],
         "affected_capability_ids": ["capability:project-intelligence"],
         "provenance": {
@@ -365,9 +365,9 @@
           "observed_at": "2026-07-31T23:00:00Z"
         },
         "confidence": {
-          "score": 0.8,
+          "score": 1.0,
           "status": "verified",
-          "explanation": "Ruff, strict MyPy, focused API tests, schema validation, and migration inspection passed locally; PostgreSQL, Docker, Compose, and live-stack gates await CI."
+          "explanation": "Control Plane CI #63 passed locked Ruff, formatting, strict MyPy, Markdown, PostgreSQL migrations, the full test suite, migration round-trip and model parity, Docker/Compose builds, and live-stack health."
         }
       },
       {
@@ -484,9 +484,9 @@
         "observed_at": "2026-07-31T23:00:00Z"
       },
       "confidence": {
-        "score": 0.8,
+        "score": 1.0,
         "status": "verified",
-        "explanation": "The local implementation and focused tests pass; full CI remains pending."
+        "explanation": "The implementation and full Control Plane CI #63 pass."
       }
     }
   ],

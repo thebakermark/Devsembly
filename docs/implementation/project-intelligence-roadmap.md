@@ -16,7 +16,7 @@ scoped agent context, and an evidence-backed executive read model.
 | 4 | [Validation, risk, and debt projections](https://github.com/thebakermark/Devsembly/issues/27) — implemented in draft PR #17 | 2, 3 | Evidence links; staleness; risk owners; debt impact and retirement criteria |
 | 5 | [Usage and AI cost ledger](https://github.com/thebakermark/Devsembly/issues/28) | 1 | Provider-neutral tokens/tools; price snapshots; actual/estimate reconciliation |
 | 6 | Budget admission and forecast | 4, 5 | Scenarios; P50/P80/P95; approval gates; calibration evidence |
-| 7 | [MemoryOS context interface](https://github.com/thebakermark/Devsembly/issues/29) — implementation in draft PR #17 | 2, 4 | Authorized retrieval; token budgets; provenance; retention; invalidation |
+| 7 | [MemoryOS context interface](https://github.com/thebakermark/Devsembly/issues/29) — implemented in draft PR #17 | 2, 4 | Authorized retrieval; token budgets; provenance; retention; invalidation |
 | 8 | Recommendations and sprint planning | 4, 6, 7 | Policy filter; readiness; value/risk/cost scoring; explanations |
 | 9 | [Executive dashboard and Genesis template](https://github.com/thebakermark/Devsembly/issues/30) | 6, 8 | Health, delivery, spend, risk, confidence, next work; automatic bootstrap |
 
