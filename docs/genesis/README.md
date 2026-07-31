@@ -61,7 +61,7 @@ an accepted ADR and implementation evidence say otherwise.
 | [Workflow Run API v1](workflow-run-api.md) | Current workflow intent, lifecycle, step, attempt, cancellation, and retry contract |
 | [Cost Governance API v1](cost-governance-api.md) | Current cost evaluation, budget recommendation, and decision-record contract |
 | [Evidence API v1](evidence-api.md) | Current immutable ingestion, authorized retrieval, integrity, and retention contract |
-| [Project Intelligence API v1](project-intelligence-api.md) | Current immutable, versioned, provenance-aware project-state contract |
+| [Project Intelligence API v1](project-intelligence-api.md) | Current immutable project-state contract plus rebuildable work, alias, and graph projections |
 | [Capability catalog](capability-catalog.md) | Capability ownership, maturity, and provider boundaries |
 | [Traceability matrix](traceability-matrix.md) | Requirements-to-decision-to-evidence mapping |
 | [Glossary](glossary.md) | Canonical terms |
@@ -83,6 +83,7 @@ an accepted ADR and implementation evidence say otherwise.
 | Version | Date | Change |
 |---|---|---|
 | 0.1.5 | 2026-07-31 | Added Project Intelligence architecture, canonical state schema, and immutable revision API |
+| 0.1.6 | 2026-07-31 | Added canonical work items, provider aliases, capability/dependency projections, and rebuild recovery |
 | 0.1.4 | 2026-07-30 | Added evidence ingestion, authorized retrieval, integrity verification, and retention policy |
 | 0.1.3 | 2026-07-30 | Added cost evaluation, budget recommendations, and governed decisions |
 | 0.1.2 | 2026-07-30 | Added persisted workflow intent, lifecycle, steps, attempts, cancellation, and retry |

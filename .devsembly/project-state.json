@@ -44,15 +44,225 @@
     "components": []
   },
   "graphs": {
-    "capabilities": { "nodes": [], "edges": [] },
-    "dependencies": { "nodes": [], "edges": [] }
+    "capabilities": {
+      "nodes": [
+        {
+          "id": "capability:project-intelligence",
+          "kind": "capability",
+          "title": "Project Intelligence Engine",
+          "status": "active",
+          "provenance": {
+            "provider": "repository",
+            "kind": "accepted-architecture",
+            "external_id": "docs/architecture/project-intelligence-engine.md",
+            "uri": null,
+            "occurred_at": null,
+            "observed_at": "2026-07-31T16:00:00Z"
+          },
+          "confidence": {
+            "score": 1.0,
+            "status": "verified",
+            "explanation": "PIE is an accepted Genesis capability implemented in draft PR #17."
+          }
+        },
+        {
+          "id": "component:pie-projection",
+          "kind": "component",
+          "title": "PIE relational projection",
+          "status": "active",
+          "provenance": {
+            "provider": "repository",
+            "kind": "implementation",
+            "external_id": "alembic/versions/0011_project_intelligence_projections.py",
+            "uri": null,
+            "occurred_at": null,
+            "observed_at": "2026-07-31T16:00:00Z"
+          },
+          "confidence": {
+            "score": 1.0,
+            "status": "verified",
+            "explanation": "Migration, models, services, APIs, and tests implement the projection."
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge:pie-implements-projection",
+          "from": "capability:project-intelligence",
+          "to": "component:pie-projection",
+          "type": "implements",
+          "provenance": {
+            "provider": "repository",
+            "kind": "implementation",
+            "external_id": "devsembly/pie_projection.py",
+            "uri": null,
+            "occurred_at": null,
+            "observed_at": "2026-07-31T16:00:00Z"
+          },
+          "confidence": {
+            "score": 1.0,
+            "status": "verified",
+            "explanation": "The projection builder derives normalized read models from PIE revisions."
+          }
+        }
+      ]
+    },
+    "dependencies": {
+      "nodes": [
+        {
+          "id": "component:pie-revision-log",
+          "kind": "component",
+          "title": "PIE immutable revision log",
+          "status": "active",
+          "provenance": {
+            "provider": "repository",
+            "kind": "implementation",
+            "external_id": "alembic/versions/0010_project_intelligence_state.py",
+            "uri": null,
+            "occurred_at": null,
+            "observed_at": "2026-07-31T16:00:00Z"
+          },
+          "confidence": {
+            "score": 1.0,
+            "status": "verified",
+            "explanation": "The immutable revision log is the canonical PIE write model."
+          }
+        },
+        {
+          "id": "component:pie-projection",
+          "kind": "component",
+          "title": "PIE relational projection",
+          "status": "active",
+          "provenance": {
+            "provider": "repository",
+            "kind": "implementation",
+            "external_id": "alembic/versions/0011_project_intelligence_projections.py",
+            "uri": null,
+            "occurred_at": null,
+            "observed_at": "2026-07-31T16:00:00Z"
+          },
+          "confidence": {
+            "score": 1.0,
+            "status": "verified",
+            "explanation": "The projection is rebuilt from an immutable source revision."
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge:projection-depends-on-revisions",
+          "from": "component:pie-projection",
+          "to": "component:pie-revision-log",
+          "type": "depends_on",
+          "provenance": {
+            "provider": "repository",
+            "kind": "accepted-decision",
+            "external_id": "docs/architecture/decisions/0015-project-intelligence-rebuildable-projections.md",
+            "uri": null,
+            "occurred_at": null,
+            "observed_at": "2026-07-31T16:00:00Z"
+          },
+          "confidence": {
+            "score": 1.0,
+            "status": "verified",
+            "explanation": "ADR-0015 requires projections to derive from canonical revisions."
+          }
+        }
+      ]
+    }
   },
   "planning": {
     "roadmap": [],
-    "milestones": [],
-    "epics": [],
+    "milestones": [
+      {
+        "id": "milestone:genesis-pie-foundation",
+        "title": "Genesis PIE Foundation",
+        "status": "active",
+        "provenance": {
+          "provider": "github",
+          "kind": "milestone-tracking-issue",
+          "external_id": "32",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/32",
+          "occurred_at": "2026-07-31T15:08:07Z",
+          "observed_at": "2026-07-31T16:00:00Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Authenticated GitHub issue #32 represents the milestone."
+        },
+        "aliases": [
+          {
+            "provider": "github",
+            "account": "thebakermark/Devsembly",
+            "kind": "issue",
+            "external_id": "32",
+            "uri": "https://github.com/thebakermark/Devsembly/issues/32"
+          }
+        ]
+      }
+    ],
+    "epics": [
+      {
+        "id": "epic:project-intelligence",
+        "title": "Project Intelligence Engine",
+        "status": "active",
+        "parent_id": "milestone:genesis-pie-foundation",
+        "provenance": {
+          "provider": "github",
+          "kind": "epic-issue",
+          "external_id": "31",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/31",
+          "occurred_at": "2026-07-31T15:07:57Z",
+          "observed_at": "2026-07-31T16:00:00Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Authenticated GitHub issue #31 is the PIE epic."
+        },
+        "aliases": [
+          {
+            "provider": "github",
+            "account": "thebakermark/Devsembly",
+            "kind": "issue",
+            "external_id": "31",
+            "uri": "https://github.com/thebakermark/Devsembly/issues/31"
+          }
+        ]
+      }
+    ],
     "features": [],
-    "tasks": [],
+    "tasks": [
+      {
+        "id": "task:pie-25",
+        "title": "Canonical work items, provider aliases, and graph projections",
+        "status": "completed",
+        "parent_id": "epic:project-intelligence",
+        "provenance": {
+          "provider": "github",
+          "kind": "implementation-issue",
+          "external_id": "25",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/25",
+          "occurred_at": "2026-07-31T15:07:36Z",
+          "observed_at": "2026-07-31T16:00:00Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "The implementation and local validation satisfy issue #25 acceptance criteria."
+        },
+        "aliases": [
+          {
+            "provider": "github",
+            "account": "thebakermark/Devsembly",
+            "kind": "issue",
+            "external_id": "25",
+            "uri": "https://github.com/thebakermark/Devsembly/issues/25"
+          }
+        ]
+      }
+    ],
     "current_sprint": null
   },
   "validation": {

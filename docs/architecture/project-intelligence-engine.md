@@ -70,6 +70,15 @@ hierarchy, capability and dependency graphs, dashboards, and agent context. Proj
 source revision and can be rebuilt. Relational adjacency lists and recursive queries are the first
 graph implementation; a graph database requires measured need and a new ADR.
 
+The first projection slice normalizes roadmap, milestone, epic, feature, task, and sprint items;
+provider aliases; capability and dependency nodes; and typed edges. Canonical IDs remain
+project-scoped PIE identifiers. Provider aliases are unique within provider, account, external kind,
+and external ID scope. Reconciliation validates parent kinds, rejects missing or cross-project
+references, and proves both hierarchies and graphs acyclic before atomically replacing the current
+projection. A checkpoint records the exact source revision and rebuild time, including when a
+projection contains no rows. Only the latest revision may become the current projection; historical
+revisions remain directly readable without displacing current state.
+
 ## Agent interfaces and memory
 
 Agents never write tables directly. They read current or historical revisions, future graph and
