@@ -22,6 +22,7 @@ from devsembly.domain import (
     InitiativeStatus,
     Organization,
     OutboxMessage,
+    ProjectStateAssertionStatus,
     ProjectStatus,
     WorkflowAttemptStatus,
     WorkflowRunStatus,
@@ -35,6 +36,7 @@ from devsembly.errors import (
     StaleVersionError,
 )
 from devsembly.genesis_service import GenesisService
+from devsembly.pie_service import ProjectIntelligenceService
 from devsembly.unit_of_work import SqlAlchemyUnitOfWork
 from devsembly.workflow_service import WorkflowService
 
@@ -171,6 +173,82 @@ async def test_unit_of_work_rolls_back_domain_and_outbox_together(
     assert stored_organization is None
     assert stored_event is None
     assert audit_count == 0
+
+
+async def test_project_intelligence_revisions_are_atomic_and_idempotent(
+    postgres_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    factory = lambda: SqlAlchemyUnitOfWork(postgres_factory)
+    genesis = GenesisService(factory)
+    pie = ProjectIntelligenceService(factory)
+    organization = await genesis.create_organization("PIE")
+    initiative = await genesis.create_initiative(
+        organization.id,
+        name="Genesis",
+        objective="Persist canonical project state.",
+        status=InitiativeStatus.ACTIVE,
+    )
+    project = await genesis.create_project(
+        organization.id,
+        initiative.id,
+        name="Project Intelligence",
+        repository="thebakermark/Devsembly",
+        status=ProjectStatus.ACTIVE,
+    )
+
+    first = await pie.reconcile(
+        organization.id,
+        initiative.id,
+        project.id,
+        expected_version=0,
+        idempotency_key="github:pr:17:c077ce0",
+        schema_version="1.0",
+        state={"project": {"id": "project:devsembly", "status": "active"}},
+        source_provider="github",
+        source_kind="pull_request",
+        source_event_id="c077ce0",
+        source_uri="https://github.com/thebakermark/Devsembly/pull/17",
+        source_occurred_at=None,
+        assertion_status=ProjectStateAssertionStatus.VERIFIED,
+        confidence=Decimal("1.0000"),
+        confidence_explanation="Authenticated GitHub state.",
+    )
+    repeated = await pie.reconcile(
+        organization.id,
+        initiative.id,
+        project.id,
+        expected_version=0,
+        idempotency_key="github:pr:17:c077ce0",
+        schema_version="1.0",
+        state={"project": {"id": "project:devsembly", "status": "active"}},
+        source_provider="github",
+        source_kind="pull_request",
+        source_event_id="c077ce0",
+        source_uri="https://github.com/thebakermark/Devsembly/pull/17",
+        source_occurred_at=None,
+        assertion_status=ProjectStateAssertionStatus.VERIFIED,
+        confidence=Decimal("1.0000"),
+        confidence_explanation="Authenticated GitHub state.",
+    )
+    assert repeated.id == first.id
+
+    async with postgres_factory() as session:
+        revision_count = await session.scalar(
+            select(func.count()).select_from(models.ProjectStateRevision)
+        )
+        event_count = await session.scalar(
+            select(func.count()).where(
+                models.OutboxEvent.topic == "genesis.project-intelligence.state-reconciled"
+            )
+        )
+        audit_count = await session.scalar(
+            select(func.count()).where(
+                models.AuditEvent.action == "genesis.project-intelligence.state-reconciled"
+            )
+        )
+    assert revision_count == 1
+    assert event_count == 1
+    assert audit_count == 1
 
 
 async def test_workflow_repositories_persist_scope_idempotency_attempts_and_retry(

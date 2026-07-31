@@ -26,6 +26,7 @@ from devsembly.genesis_api import router as genesis_router
 from devsembly.identity_api import organization_router as identity_organization_router
 from devsembly.identity_api import router as identity_router
 from devsembly.outbox_publisher import worker_readiness
+from devsembly.pie_api import router as pie_router
 from devsembly.workflow_api import internal_router as workflow_internal_router
 from devsembly.workflow_api import router as workflow_router
 from devsembly.workflow_dispatcher import WORKER_NAME as DISPATCHER_WORKER_NAME
@@ -38,6 +39,7 @@ app.include_router(cost_router)
 app.include_router(identity_router)
 app.include_router(identity_organization_router)
 app.include_router(evidence_router)
+app.include_router(pie_router)
 
 
 @app.middleware("http")

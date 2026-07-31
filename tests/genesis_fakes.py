@@ -16,6 +16,7 @@ from devsembly.domain import (
     Organization,
     OutboxMessage,
     Project,
+    ProjectStateRevision,
     WorkflowRun,
     WorkflowStep,
     WorkflowStepAttempt,
@@ -28,6 +29,7 @@ class MemoryStore:
     organizations: dict[uuid.UUID, Organization] = field(default_factory=dict)
     initiatives: dict[uuid.UUID, Initiative] = field(default_factory=dict)
     projects: dict[uuid.UUID, Project] = field(default_factory=dict)
+    project_state_revisions: dict[uuid.UUID, ProjectStateRevision] = field(default_factory=dict)
     budgets: dict[uuid.UUID, Budget] = field(default_factory=dict)
     cost_evaluations: dict[uuid.UUID, CostEvaluation] = field(default_factory=dict)
     decisions: dict[uuid.UUID, Decision] = field(default_factory=dict)
@@ -160,6 +162,63 @@ class MemoryProjectRepository:
         )
         self.store.projects[project_id] = updated
         return updated
+
+
+class MemoryProjectStateRevisionRepository:
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def add(self, revision: ProjectStateRevision) -> ProjectStateRevision:
+        if any(
+            item.project_id == revision.project_id
+            and (
+                item.version == revision.version or item.idempotency_key == revision.idempotency_key
+            )
+            for item in self.store.project_state_revisions.values()
+        ):
+            raise DuplicateResourceError("project state revision")
+        self.store.project_state_revisions[revision.id] = revision
+        return revision
+
+    async def latest(self, project_id: uuid.UUID) -> ProjectStateRevision | None:
+        matches = [
+            item
+            for item in self.store.project_state_revisions.values()
+            if item.project_id == project_id
+        ]
+        return None if not matches else max(matches, key=lambda item: item.version)
+
+    async def get_version(self, project_id: uuid.UUID, version: int) -> ProjectStateRevision | None:
+        return next(
+            (
+                item
+                for item in self.store.project_state_revisions.values()
+                if item.project_id == project_id and item.version == version
+            ),
+            None,
+        )
+
+    async def get_by_idempotency_key(
+        self, project_id: uuid.UUID, idempotency_key: str
+    ) -> ProjectStateRevision | None:
+        return next(
+            (
+                item
+                for item in self.store.project_state_revisions.values()
+                if item.project_id == project_id and item.idempotency_key == idempotency_key
+            ),
+            None,
+        )
+
+    async def list(self, project_id: uuid.UUID) -> list[ProjectStateRevision]:
+        return sorted(
+            (
+                item
+                for item in self.store.project_state_revisions.values()
+                if item.project_id == project_id
+            ),
+            key=lambda item: item.version,
+        )
 
 
 class MemoryBudgetRepository:
@@ -499,6 +558,7 @@ class MemoryUnitOfWork:
         self.organizations = MemoryOrganizationRepository(store)
         self.initiatives = MemoryInitiativeRepository(store)
         self.projects = MemoryProjectRepository(store)
+        self.project_state_revisions = MemoryProjectStateRevisionRepository(store)
         self.budgets = MemoryBudgetRepository(store)
         self.cost_evaluations = MemoryCostEvaluationRepository(store)
         self.decisions = MemoryDecisionRepository(store)

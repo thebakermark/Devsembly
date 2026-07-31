@@ -93,6 +93,12 @@ class EvidenceRetentionClass(StrEnum):
     PERMANENT = "permanent"
 
 
+class ProjectStateAssertionStatus(StrEnum):
+    VERIFIED = "verified"
+    INFERRED = "inferred"
+    DISPUTED = "disputed"
+
+
 @dataclass(frozen=True, slots=True)
 class Organization:
     id: uuid.UUID
@@ -282,6 +288,29 @@ class Evidence:
     size_bytes: int
     retention_class: EvidenceRetentionClass
     retain_until: datetime | None
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectStateRevision:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    version: int
+    parent_revision_id: uuid.UUID | None
+    schema_version: str
+    state: dict[str, object]
+    state_sha256: str
+    idempotency_key: str
+    request_fingerprint: str
+    source_provider: str
+    source_kind: str
+    source_event_id: str | None
+    source_uri: str | None
+    source_occurred_at: datetime | None
+    observed_at: datetime
+    assertion_status: ProjectStateAssertionStatus
+    confidence: Decimal
+    confidence_explanation: str
     created_at: datetime
 
 

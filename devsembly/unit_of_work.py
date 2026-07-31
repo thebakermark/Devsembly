@@ -15,6 +15,7 @@ from devsembly.repositories import (
     OrganizationRepository,
     OutboxRepository,
     ProjectRepository,
+    ProjectStateRevisionRepository,
     WorkflowRunRepository,
     WorkflowStepAttemptRepository,
     WorkflowStepRepository,
@@ -28,6 +29,7 @@ from devsembly.sqlalchemy_repositories import (
     SqlAlchemyOrganizationRepository,
     SqlAlchemyOutboxRepository,
     SqlAlchemyProjectRepository,
+    SqlAlchemyProjectStateRevisionRepository,
     SqlAlchemyWorkflowRunRepository,
     SqlAlchemyWorkflowStepAttemptRepository,
     SqlAlchemyWorkflowStepRepository,
@@ -43,6 +45,9 @@ class UnitOfWork(Protocol):
 
     @property
     def projects(self) -> ProjectRepository: ...
+
+    @property
+    def project_state_revisions(self) -> ProjectStateRevisionRepository: ...
 
     @property
     def budgets(self) -> BudgetRepository: ...
@@ -107,6 +112,10 @@ class SqlAlchemyUnitOfWork:
     @property
     def projects(self) -> ProjectRepository:
         return SqlAlchemyProjectRepository(self._active_session())
+
+    @property
+    def project_state_revisions(self) -> ProjectStateRevisionRepository:
+        return SqlAlchemyProjectStateRevisionRepository(self._active_session())
 
     @property
     def budgets(self) -> BudgetRepository:

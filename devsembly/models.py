@@ -213,6 +213,66 @@ class Budget(Timestamped, Base):
     )
 
 
+class ProjectStateRevision(Base):
+    __tablename__ = "project_state_revisions"
+    __table_args__ = (
+        CheckConstraint("version > 0", name="ck_project_state_revisions_version"),
+        CheckConstraint(
+            "assertion_status IN ('verified', 'inferred', 'disputed')",
+            name="ck_project_state_revisions_assertion_status",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_project_state_revisions_confidence",
+        ),
+        CheckConstraint(
+            "state_sha256 ~ '^[0-9a-f]{64}$'",
+            name="ck_project_state_revisions_state_sha256",
+        ),
+        CheckConstraint(
+            "request_fingerprint ~ '^[0-9a-f]{64}$'",
+            name="ck_project_state_revisions_request_fingerprint",
+        ),
+        UniqueConstraint("project_id", "version", name="uq_project_state_project_version"),
+        UniqueConstraint(
+            "project_id", "idempotency_key", name="uq_project_state_project_idempotency"
+        ),
+        Index("ix_project_state_project_created", "project_id", "created_at"),
+        Index(
+            "ix_project_state_source_event",
+            "project_id",
+            "source_provider",
+            "source_event_id",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    parent_revision_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("project_state_revisions.id", ondelete="RESTRICT")
+    )
+    schema_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    state: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    state_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(200), nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_provider: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_kind: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_event_id: Mapped[str | None] = mapped_column(String(255))
+    source_uri: Mapped[str | None] = mapped_column(String(1000))
+    source_occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    assertion_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
+    confidence_explanation: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class CostEvaluation(Base):
     __tablename__ = "cost_evaluations"
     __table_args__ = (

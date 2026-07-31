@@ -15,6 +15,7 @@ from devsembly.domain import (
     Organization,
     OutboxMessage,
     Project,
+    ProjectStateRevision,
     WorkflowRun,
     WorkflowStep,
     WorkflowStepAttempt,
@@ -71,6 +72,22 @@ class ProjectRepository(Protocol):
         repository: str | None,
         status: str,
     ) -> Project | None: ...
+
+
+class ProjectStateRevisionRepository(Protocol):
+    async def add(self, revision: ProjectStateRevision) -> ProjectStateRevision: ...
+
+    async def latest(self, project_id: uuid.UUID) -> ProjectStateRevision | None: ...
+
+    async def get_version(
+        self, project_id: uuid.UUID, version: int
+    ) -> ProjectStateRevision | None: ...
+
+    async def get_by_idempotency_key(
+        self, project_id: uuid.UUID, idempotency_key: str
+    ) -> ProjectStateRevision | None: ...
+
+    async def list(self, project_id: uuid.UUID) -> Sequence[ProjectStateRevision]: ...
 
 
 class BudgetRepository(Protocol):

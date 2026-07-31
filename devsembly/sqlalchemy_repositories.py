@@ -31,6 +31,8 @@ from devsembly.domain import (
     Organization,
     OutboxMessage,
     Project,
+    ProjectStateAssertionStatus,
+    ProjectStateRevision,
     ProjectStatus,
     WorkflowAttemptStatus,
     WorkflowRun,
@@ -75,6 +77,30 @@ def _project(model: models.Project) -> Project:
         version=model.version,
         created_at=model.created_at,
         updated_at=model.updated_at,
+    )
+
+
+def _project_state_revision(model: models.ProjectStateRevision) -> ProjectStateRevision:
+    return ProjectStateRevision(
+        id=model.id,
+        project_id=model.project_id,
+        version=model.version,
+        parent_revision_id=model.parent_revision_id,
+        schema_version=model.schema_version,
+        state=model.state,
+        state_sha256=model.state_sha256,
+        idempotency_key=model.idempotency_key,
+        request_fingerprint=model.request_fingerprint,
+        source_provider=model.source_provider,
+        source_kind=model.source_kind,
+        source_event_id=model.source_event_id,
+        source_uri=model.source_uri,
+        source_occurred_at=model.source_occurred_at,
+        observed_at=model.observed_at,
+        assertion_status=ProjectStateAssertionStatus(model.assertion_status),
+        confidence=model.confidence,
+        confidence_explanation=model.confidence_explanation,
+        created_at=model.created_at,
     )
 
 
@@ -467,6 +493,78 @@ class SqlAlchemyProjectRepository:
         if await self.get(initiative_id, project_id) is None:
             return None
         raise StaleVersionError("project", expected_version)
+
+
+class SqlAlchemyProjectStateRevisionRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, revision: ProjectStateRevision) -> ProjectStateRevision:
+        self._session.add(
+            models.ProjectStateRevision(
+                id=revision.id,
+                project_id=revision.project_id,
+                version=revision.version,
+                parent_revision_id=revision.parent_revision_id,
+                schema_version=revision.schema_version,
+                state=revision.state,
+                state_sha256=revision.state_sha256,
+                idempotency_key=revision.idempotency_key,
+                request_fingerprint=revision.request_fingerprint,
+                source_provider=revision.source_provider,
+                source_kind=revision.source_kind,
+                source_event_id=revision.source_event_id,
+                source_uri=revision.source_uri,
+                source_occurred_at=revision.source_occurred_at,
+                observed_at=revision.observed_at,
+                assertion_status=revision.assertion_status.value,
+                confidence=revision.confidence,
+                confidence_explanation=revision.confidence_explanation,
+                created_at=revision.created_at,
+            )
+        )
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            raise DuplicateResourceError("project state revision") from exc
+        return revision
+
+    async def latest(self, project_id: uuid.UUID) -> ProjectStateRevision | None:
+        model = await self._session.scalar(
+            select(models.ProjectStateRevision)
+            .where(models.ProjectStateRevision.project_id == project_id)
+            .order_by(models.ProjectStateRevision.version.desc())
+            .limit(1)
+        )
+        return None if model is None else _project_state_revision(model)
+
+    async def get_version(self, project_id: uuid.UUID, version: int) -> ProjectStateRevision | None:
+        model = await self._session.scalar(
+            select(models.ProjectStateRevision).where(
+                models.ProjectStateRevision.project_id == project_id,
+                models.ProjectStateRevision.version == version,
+            )
+        )
+        return None if model is None else _project_state_revision(model)
+
+    async def get_by_idempotency_key(
+        self, project_id: uuid.UUID, idempotency_key: str
+    ) -> ProjectStateRevision | None:
+        model = await self._session.scalar(
+            select(models.ProjectStateRevision).where(
+                models.ProjectStateRevision.project_id == project_id,
+                models.ProjectStateRevision.idempotency_key == idempotency_key,
+            )
+        )
+        return None if model is None else _project_state_revision(model)
+
+    async def list(self, project_id: uuid.UUID) -> Sequence[ProjectStateRevision]:
+        result = await self._session.scalars(
+            select(models.ProjectStateRevision)
+            .where(models.ProjectStateRevision.project_id == project_id)
+            .order_by(models.ProjectStateRevision.version)
+        )
+        return [_project_state_revision(model) for model in result]
 
 
 class SqlAlchemyBudgetRepository:
