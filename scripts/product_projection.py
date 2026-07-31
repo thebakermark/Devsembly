@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Render or verify the canonical product-definition projection.
 
-The canonical input is ``.devsembly/project-state.json``. The state must contain a
-``product_definition`` object conforming to
-``docs/genesis/schemas/product-definition.schema.json``.
+The canonical input is resolved through ``.devsembly/manifest.json``. The
+manifest keeps one governed source-of-truth package while allowing large,
+independently changing domains to live in separate schema-controlled modules.
 """
 
 from __future__ import annotations
@@ -16,7 +16,8 @@ from typing import Any
 from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[1]
-STATE_PATH = ROOT / ".devsembly" / "project-state.json"
+STATE_ROOT = ROOT / ".devsembly"
+MANIFEST_PATH = STATE_ROOT / "manifest.json"
 SCHEMA_PATH = ROOT / "docs" / "genesis" / "schemas" / "product-definition.schema.json"
 OUTPUT_PATH = ROOT / "docs" / "product" / "product-definition.generated.md"
 
@@ -27,6 +28,21 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{path} must contain a JSON object")
     return value
+
+
+def resolve_module(manifest: dict[str, Any], module_name: str) -> Path:
+    modules = manifest.get("modules")
+    if not isinstance(modules, dict):
+        raise SystemExit(".devsembly/manifest.json is missing object 'modules'")
+    relative_path = modules.get(module_name)
+    if not isinstance(relative_path, str) or not relative_path:
+        raise SystemExit(f"manifest is missing module '{module_name}'")
+
+    resolved = (STATE_ROOT / relative_path).resolve()
+    state_root = STATE_ROOT.resolve()
+    if resolved.parent != state_root:
+        raise SystemExit(f"module '{module_name}' must be a direct child of .devsembly")
+    return resolved
 
 
 def render(definition: dict[str, Any]) -> str:
@@ -40,7 +56,7 @@ def render(definition: dict[str, Any]) -> str:
         f"| `{binding['stable_id']}` | {binding['display_name']} | {binding['technical_term']} |"
         for binding in names.values()
     )
-    return f"""<!-- GENERATED FILE: edit .devsembly/project-state.json, not this file. -->
+    return f"""<!-- GENERATED FILE: edit .devsembly/product-definition.json, not this file. -->
 # {definition['display_name']} Product Definition
 
 **Stable ID:** `{definition['stable_id']}`  
@@ -86,19 +102,21 @@ def main() -> int:
     mode.add_argument("--check", action="store_true", help="fail when the projection has drifted")
     args = parser.parse_args()
 
-    state = load_json(STATE_PATH)
-    definition = state.get("product_definition")
-    if not isinstance(definition, dict):
-        raise SystemExit(
-            "project-state.json is missing required object 'product_definition'; "
-            "run the canonical-state upgrade before generating product documentation"
-        )
+    manifest = load_json(MANIFEST_PATH)
+    definition_path = resolve_module(manifest, "product_definition")
+    definition = load_json(definition_path)
 
     schema = load_json(SCHEMA_PATH)
-    errors = sorted(Draft202012Validator(schema).iter_errors(definition), key=lambda item: list(item.path))
+    errors = sorted(
+        Draft202012Validator(schema).iter_errors(definition),
+        key=lambda item: list(item.path),
+    )
     if errors:
-        formatted = "\n".join(f"- {'/'.join(map(str, error.path)) or '<root>'}: {error.message}" for error in errors)
-        raise SystemExit(f"product_definition is invalid:\n{formatted}")
+        formatted = "\n".join(
+            f"- {'/'.join(map(str, error.path)) or '<root>'}: {error.message}"
+            for error in errors
+        )
+        raise SystemExit(f"product definition is invalid:\n{formatted}")
 
     expected = render(definition)
     if args.write:
