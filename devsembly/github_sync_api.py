@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import os
 import uuid
-from typing import Annotated
+from datetime import datetime
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -10,7 +11,7 @@ from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import WorkflowAlreadyStartedError
 
-from devsembly.auth import internal_control_authorized
+from devsembly.auth import AuthorizedPrincipal, authorize_request, internal_control_authorized
 from devsembly.github_sync import (
     GitHubSynchronizationService,
     InvalidGitHubEvent,
@@ -22,6 +23,14 @@ from devsembly.github_sync import (
 from devsembly.temporal_workflows import GitHubSnapshotWorkflow
 
 router = APIRouter(prefix="/api/v1/internal/projects/{project_id}/github", tags=["GitHub Sync"])
+conflict_router = APIRouter(
+    prefix=(
+        "/api/v1/organizations/{organization_id}/initiatives/{initiative_id}"
+        "/projects/{project_id}/project-intelligence/github-conflicts"
+    ),
+    tags=["GitHub Sync"],
+    dependencies=[Depends(authorize_request)],
+)
 
 
 class SnapshotEntity(BaseModel):
@@ -38,6 +47,65 @@ class SnapshotScheduleRequest(BaseModel):
     repository_id: str = Field(min_length=1, max_length=80)
     repository: str = Field(pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", max_length=200)
     interval_seconds: int = Field(default=1800, ge=300, le=86400)
+
+
+class ConflictResolutionRequest(BaseModel):
+    resolution: Literal["keep_current", "accept_incoming"]
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+class ConflictRead(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    entity_id: str
+    current_sha256: str
+    incoming_sha256: str
+    current_authority: str
+    incoming_authority: str
+    reason: str
+    status: str
+    created_at: datetime
+    resolved_at: datetime | None
+    resolution: str | None
+    resolution_reason: str | None
+    resolved_by: uuid.UUID | None
+
+
+@conflict_router.get("", response_model=list[ConflictRead])
+async def list_github_conflicts(
+    organization_id: uuid.UUID,
+    initiative_id: uuid.UUID,
+    project_id: uuid.UUID,
+    conflict_status: Literal["open", "resolved"] = "open",
+) -> list[ConflictRead]:
+    conflicts = await GitHubSynchronizationService().list_conflicts(
+        organization_id, initiative_id, project_id, status=conflict_status
+    )
+    return [ConflictRead.model_validate(item, from_attributes=True) for item in conflicts]
+
+
+@conflict_router.post("/{conflict_id}/resolve", response_model=ConflictRead)
+async def resolve_github_conflict(
+    organization_id: uuid.UUID,
+    initiative_id: uuid.UUID,
+    project_id: uuid.UUID,
+    conflict_id: uuid.UUID,
+    request: ConflictResolutionRequest,
+    principal: AuthorizedPrincipal,
+) -> ConflictRead:
+    try:
+        result = await GitHubSynchronizationService().resolve_conflict(
+            organization_id,
+            initiative_id,
+            project_id,
+            conflict_id,
+            resolution=request.resolution,
+            reason=request.reason,
+            principal_id=principal.principal_id,
+        )
+    except InvalidGitHubEvent as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return ConflictRead.model_validate(result, from_attributes=True)
 
 
 @router.post("/events", status_code=status.HTTP_202_ACCEPTED)

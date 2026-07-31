@@ -61,6 +61,24 @@ class SnapshotReconciliationResult:
     stale_sources: int
 
 
+@dataclass(frozen=True, slots=True)
+class ReconciliationConflict:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    entity_id: str
+    current_sha256: str
+    incoming_sha256: str
+    current_authority: str
+    incoming_authority: str
+    reason: str
+    status: str
+    created_at: datetime
+    resolved_at: datetime | None
+    resolution: str | None
+    resolution_reason: str | None
+    resolved_by: uuid.UUID | None
+
+
 def verify_signature(body: bytes, signature: str | None, secret: str) -> None:
     if not secret:
         raise InvalidGitHubSignature("GitHub webhook secret is not configured")
@@ -144,6 +162,182 @@ class GitHubSynchronizationService:
         session_factory: async_sessionmaker[AsyncSession] = SessionFactory,
     ) -> None:
         self._session_factory = session_factory
+
+    @staticmethod
+    def _conflict(record: models.GitHubReconciliationConflict) -> ReconciliationConflict:
+        return ReconciliationConflict(
+            id=record.id,
+            project_id=record.project_id,
+            entity_id=record.entity_id,
+            current_sha256=record.current_sha256,
+            incoming_sha256=record.incoming_sha256,
+            current_authority=record.current_authority,
+            incoming_authority=record.incoming_authority,
+            reason=record.reason,
+            status=record.status,
+            created_at=record.created_at,
+            resolved_at=record.resolved_at,
+            resolution=record.resolution,
+            resolution_reason=record.resolution_reason,
+            resolved_by=record.resolved_by,
+        )
+
+    async def list_conflicts(
+        self,
+        organization_id: uuid.UUID,
+        initiative_id: uuid.UUID,
+        project_id: uuid.UUID,
+        *,
+        status: str = "open",
+    ) -> list[ReconciliationConflict]:
+        if status not in {"open", "resolved"}:
+            raise InvalidGitHubEvent("status must be open or resolved")
+        async with self._session_factory() as session:
+            await self._require_project(session, organization_id, initiative_id, project_id)
+            records = await session.scalars(
+                select(models.GitHubReconciliationConflict)
+                .where(
+                    models.GitHubReconciliationConflict.project_id == project_id,
+                    models.GitHubReconciliationConflict.status == status,
+                )
+                .order_by(models.GitHubReconciliationConflict.created_at)
+            )
+            return [self._conflict(record) for record in records]
+
+    async def resolve_conflict(
+        self,
+        organization_id: uuid.UUID,
+        initiative_id: uuid.UUID,
+        project_id: uuid.UUID,
+        conflict_id: uuid.UUID,
+        *,
+        resolution: str,
+        reason: str,
+        principal_id: uuid.UUID,
+        resolved_at: datetime | None = None,
+    ) -> ReconciliationConflict:
+        if resolution not in {"keep_current", "accept_incoming"}:
+            raise InvalidGitHubEvent("resolution must be keep_current or accept_incoming")
+        now = resolved_at or datetime.now(UTC)
+        async with self._session_factory() as session:
+            await self._require_project(session, organization_id, initiative_id, project_id)
+            conflict = await session.scalar(
+                select(models.GitHubReconciliationConflict)
+                .where(
+                    models.GitHubReconciliationConflict.id == conflict_id,
+                    models.GitHubReconciliationConflict.project_id == project_id,
+                )
+                .with_for_update()
+            )
+            if conflict is None:
+                raise InvalidGitHubEvent("reconciliation conflict was not found")
+            if conflict.status == "resolved":
+                if (
+                    conflict.resolution != resolution
+                    or conflict.resolution_reason != reason
+                    or conflict.resolved_by != principal_id
+                ):
+                    raise InvalidGitHubEvent("reconciliation conflict is already resolved")
+                return self._conflict(conflict)
+            source = await session.scalar(
+                select(models.GitHubSourceState)
+                .where(
+                    models.GitHubSourceState.project_id == project_id,
+                    models.GitHubSourceState.entity_id == conflict.entity_id,
+                )
+                .with_for_update()
+            )
+            if source is None or source.payload_sha256 != conflict.current_sha256:
+                raise InvalidGitHubEvent("canonical source changed; create a fresh conflict")
+            source.authority = "approved"
+            if resolution == "accept_incoming":
+                delivery = await session.scalar(
+                    select(models.GitHubDelivery)
+                    .where(
+                        models.GitHubDelivery.project_id == project_id,
+                        models.GitHubDelivery.entity_id == conflict.entity_id,
+                        models.GitHubDelivery.payload_sha256 == conflict.incoming_sha256,
+                    )
+                    .order_by(models.GitHubDelivery.observed_at.desc())
+                )
+                if delivery is None:
+                    raise InvalidGitHubEvent("incoming conflict evidence is unavailable")
+                source.payload_sha256 = delivery.payload_sha256
+                source.authority = "approved"
+                source.last_delivery_id = delivery.delivery_id
+                source.provider_occurred_at = delivery.provider_occurred_at
+                source.observed_at = now
+                source.stale_after = now + FRESHNESS_WINDOW
+            conflict.status = "resolved"
+            conflict.resolution = resolution
+            conflict.resolution_reason = reason
+            conflict.resolved_by = principal_id
+            conflict.resolved_at = now
+            remaining = await session.scalar(
+                select(models.GitHubReconciliationConflict.id).where(
+                    models.GitHubReconciliationConflict.project_id == project_id,
+                    models.GitHubReconciliationConflict.entity_id == conflict.entity_id,
+                    models.GitHubReconciliationConflict.status == "open",
+                    models.GitHubReconciliationConflict.id != conflict.id,
+                )
+            )
+            source.reconciliation_required = remaining is not None or source.stale_after <= now
+            event_id = uuid.uuid4()
+            payload: dict[str, object] = {
+                "project_id": str(project_id),
+                "conflict_id": str(conflict.id),
+                "entity_id": conflict.entity_id,
+                "resolution": resolution,
+                "reason": reason,
+                "resolved_by": str(principal_id),
+                "canonical_sha256": source.payload_sha256,
+            }
+            session.add(
+                models.OutboxEvent(
+                    id=event_id,
+                    occurred_at=now,
+                    topic="genesis.project-intelligence.github-conflict-resolved",
+                    aggregate_id=str(conflict.id),
+                    payload=payload,
+                    available_at=now,
+                )
+            )
+            session.add(
+                models.AuditEvent(
+                    id=uuid.uuid4(),
+                    occurred_at=now,
+                    actor_type="human",
+                    actor_id=str(principal_id),
+                    action="genesis.project-intelligence.github-conflict-resolved",
+                    object_type="project-intelligence.github-conflict",
+                    object_id=str(conflict.id),
+                    project_id=project_id,
+                    correlation_id=str(event_id),
+                    outcome="success",
+                    payload={"event_id": str(event_id), **payload},
+                )
+            )
+            await session.commit()
+            return self._conflict(conflict)
+
+    @staticmethod
+    async def _require_project(
+        session: AsyncSession,
+        organization_id: uuid.UUID,
+        initiative_id: uuid.UUID,
+        project_id: uuid.UUID,
+    ) -> None:
+        project = await session.scalar(
+            select(models.Project.id)
+            .join(models.Initiative, models.Project.initiative_id == models.Initiative.id)
+            .where(
+                models.Project.id == project_id,
+                models.Project.initiative_id == initiative_id,
+                models.Initiative.organization_id == organization_id,
+            )
+        )
+        if project is None:
+            raise InvalidGitHubEvent("project was not found")
 
     async def ingest(
         self,
@@ -270,23 +464,34 @@ class GitHubSynchronizationService:
                 )
                 protected = _AUTHORITY[authority] < _AUTHORITY[source.authority]
                 if same_position or protected:
-                    conflict = models.GitHubReconciliationConflict(
-                        id=uuid.uuid4(),
-                        project_id=project_id,
-                        entity_id=event.entity_id,
-                        current_sha256=source.payload_sha256,
-                        incoming_sha256=event.payload_sha256,
-                        current_authority=source.authority,
-                        incoming_authority=authority,
-                        reason=(
-                            "same-authority position contains different facts"
-                            if same_position
-                            else "lower-authority input cannot overwrite canonical facts"
-                        ),
-                        status="open",
-                        created_at=now,
+                    conflict = await session.scalar(
+                        select(models.GitHubReconciliationConflict).where(
+                            models.GitHubReconciliationConflict.project_id == project_id,
+                            models.GitHubReconciliationConflict.entity_id == event.entity_id,
+                            models.GitHubReconciliationConflict.incoming_sha256
+                            == event.payload_sha256,
+                        )
                     )
-                    session.add(conflict)
+                    if conflict is not None and conflict.status == "resolved":
+                        conflict = None
+                    elif conflict is None:
+                        conflict = models.GitHubReconciliationConflict(
+                            id=uuid.uuid4(),
+                            project_id=project_id,
+                            entity_id=event.entity_id,
+                            current_sha256=source.payload_sha256,
+                            incoming_sha256=event.payload_sha256,
+                            current_authority=source.authority,
+                            incoming_authority=authority,
+                            reason=(
+                                "same-authority position contains different facts"
+                                if same_position
+                                else "lower-authority input cannot overwrite canonical facts"
+                            ),
+                            status="open",
+                            created_at=now,
+                        )
+                        session.add(conflict)
                     apply_incoming = False
 
             if source is None:

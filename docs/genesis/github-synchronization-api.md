@@ -46,3 +46,24 @@ The workflow covers issues, pull requests, milestones, branches, commits, and Ac
 complete pass it waits for the configured interval and continues as new, bounding workflow history.
 Schedulers use `genesis-github-snapshot-{project_id}-{repository_id}` as the workflow ID so two
 schedulers cannot create competing reconciliation loops.
+
+## Governed conflict queue
+
+Authorized project members read the queue at
+`GET /api/v1/organizations/{organization_id}/initiatives/{initiative_id}/projects/{project_id}/project-intelligence/github-conflicts`.
+The `conflict_status` query parameter selects `open` (the default) or `resolved` records. Parent
+organization and initiative IDs are validated with the project, preventing cross-tenant UUID reads.
+
+Approvers resolve an item through `POST .../github-conflicts/{conflict_id}/resolve` with a required
+reason and either `keep_current` or `accept_incoming`. The normal authorization layer maps this
+endpoint to the `approve` permission; operators and viewers cannot decide conflicts unless an
+active, project-scoped approval delegation permits it. The actor is derived from the verified OIDC
+principal and is never accepted from the request body.
+
+Resolution locks both the conflict and canonical source. It refuses stale decisions if canonical
+state changed after the conflict was recorded. Accepting incoming state requires the original
+retained delivery as evidence. Either decision promotes the selected fact to `approved`, records
+the reason and principal, and atomically emits an audit record plus
+`genesis.project-intelligence.github-conflict-resolved` through the transactional outbox. Exact
+replay by the same principal is idempotent; a different second decision is rejected. The source's
+repair flag clears only after its last open conflict is resolved and it remains fresh.

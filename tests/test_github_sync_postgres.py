@@ -44,7 +44,9 @@ async def postgres_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
         await engine.dispose()
 
 
-async def _project(factory: async_sessionmaker[AsyncSession]) -> Project:
+async def _project(
+    factory: async_sessionmaker[AsyncSession],
+) -> tuple[Project, models.Organization, models.Initiative]:
     genesis = GenesisService(lambda: SqlAlchemyUnitOfWork(factory))
     organization = await genesis.create_organization("GitHub synchronization")
     initiative = await genesis.create_initiative(
@@ -53,19 +55,26 @@ async def _project(factory: async_sessionmaker[AsyncSession]) -> Project:
         objective="Repair provider state.",
         status=InitiativeStatus.ACTIVE,
     )
-    return await genesis.create_project(
+    project = await genesis.create_project(
         organization.id,
         initiative.id,
         name="Devsembly",
         repository="thebakermark/Devsembly",
         status=ProjectStatus.ACTIVE,
     )
+    async with factory() as session:
+        organization_record = await session.get(models.Organization, organization.id)
+        initiative_record = await session.get(models.Initiative, initiative.id)
+        assert organization_record is not None and initiative_record is not None
+        session.expunge(organization_record)
+        session.expunge(initiative_record)
+    return project, organization_record, initiative_record
 
 
 async def test_snapshot_retry_is_idempotent_and_stale_detection_is_once_only(
     postgres_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    project = await _project(postgres_factory)
+    project, _, _ = await _project(postgres_factory)
     service = GitHubSynchronizationService(postgres_factory)
     observed = datetime(2026, 7, 31, 17, tzinfo=UTC)
     event = normalize_snapshot_entity(
@@ -96,7 +105,7 @@ async def test_snapshot_retry_is_idempotent_and_stale_detection_is_once_only(
 async def test_delivery_identity_cannot_be_reused_for_different_content(
     postgres_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    project = await _project(postgres_factory)
+    project, _, _ = await _project(postgres_factory)
     service = GitHubSynchronizationService(postgres_factory)
     original = normalize_snapshot_entity("991", "issue", {"node_id": "I_kw26", "title": "A"})
     await service.ingest(project.id, original)
@@ -114,3 +123,71 @@ async def test_delivery_identity_cannot_be_reused_for_different_content(
     )
     with pytest.raises(InvalidGitHubEvent, match="different content"):
         await service.ingest(project.id, forged)
+
+
+async def test_conflict_resolution_is_authorized_evidenced_and_idempotent(
+    postgres_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    project, organization, initiative = await _project(postgres_factory)
+    service = GitHubSynchronizationService(postgres_factory)
+    observed = datetime(2026, 7, 31, 20, tzinfo=UTC)
+    current = normalize_snapshot_entity(
+        "991", "issue", {"node_id": "I_kw26", "updated_at": observed.isoformat(), "state": "open"}
+    )
+    incoming = normalize_snapshot_entity(
+        "991", "issue", {"node_id": "I_kw26", "updated_at": observed.isoformat(), "state": "closed"}
+    )
+    await service.ingest(project.id, current, observed_at=observed)
+    result = await service.ingest(project.id, incoming, observed_at=observed)
+    assert result.conflict_id is not None
+    async with postgres_factory() as session, session.begin():
+        principal = models.Principal(display_name="PIE approver")
+        session.add(principal)
+        await session.flush()
+        principal_id = principal.id
+
+    open_conflicts = await service.list_conflicts(organization.id, initiative.id, project.id)
+    assert [item.id for item in open_conflicts] == [result.conflict_id]
+    resolved = await service.resolve_conflict(
+        organization.id,
+        initiative.id,
+        project.id,
+        result.conflict_id,
+        resolution="accept_incoming",
+        reason="GitHub is authoritative for issue state.",
+        principal_id=principal_id,
+        resolved_at=observed + timedelta(minutes=1),
+    )
+    replay = await service.resolve_conflict(
+        organization.id,
+        initiative.id,
+        project.id,
+        result.conflict_id,
+        resolution="accept_incoming",
+        reason="GitHub is authoritative for issue state.",
+        principal_id=principal_id,
+        resolved_at=observed + timedelta(minutes=2),
+    )
+    assert resolved.status == replay.status == "resolved"
+    assert resolved.resolved_by == principal_id
+    async with postgres_factory() as session:
+        source = await session.scalar(select(models.GitHubSourceState))
+        evidence_count = await session.scalar(
+            select(func.count())
+            .select_from(models.OutboxEvent)
+            .where(
+                models.OutboxEvent.topic == "genesis.project-intelligence.github-conflict-resolved"
+            )
+        )
+        audit_count = await session.scalar(
+            select(func.count())
+            .select_from(models.AuditEvent)
+            .where(
+                models.AuditEvent.action == "genesis.project-intelligence.github-conflict-resolved"
+            )
+        )
+    assert source is not None
+    assert source.payload_sha256 == incoming.payload_sha256
+    assert source.authority == "approved"
+    assert source.reconciliation_required is False
+    assert evidence_count == audit_count == 1
