@@ -12,11 +12,11 @@ scoped agent context, and an evidence-backed executive read model.
 |---|---|---|---|
 | 1 | Canonical state revisions | Genesis project, auth, audit, outbox | Versioned reads; idempotent reconcile; provenance; schema; migration; tests |
 | 2 | [Work items, aliases, and graph edges](https://github.com/thebakermark/Devsembly/issues/25) — implemented in draft PR #17 | 1 | Stable IDs; hierarchy; capability/dependency edges; acyclic rules; projections |
-| 3 | [GitHub ingestion and reconciliation](https://github.com/thebakermark/Devsembly/issues/26) | 2 | Verified webhooks; delivery dedupe; poll repair; conflict queue; freshness |
-| 4 | [Validation, risk, and debt projections](https://github.com/thebakermark/Devsembly/issues/27) | 2, 3 | Evidence links; staleness; risk owners; debt impact and retirement criteria |
+| 3 | [GitHub ingestion and reconciliation](https://github.com/thebakermark/Devsembly/issues/26) — implemented in draft PR #17 | 2 | Verified webhooks; delivery dedupe; poll repair; conflict queue; freshness |
+| 4 | [Validation, risk, and debt projections](https://github.com/thebakermark/Devsembly/issues/27) — implemented in draft PR #17 | 2, 3 | Evidence links; staleness; risk owners; debt impact and retirement criteria |
 | 5 | [Usage and AI cost ledger](https://github.com/thebakermark/Devsembly/issues/28) | 1 | Provider-neutral tokens/tools; price snapshots; actual/estimate reconciliation |
 | 6 | Budget admission and forecast | 4, 5 | Scenarios; P50/P80/P95; approval gates; calibration evidence |
-| 7 | [MemoryOS context interface](https://github.com/thebakermark/Devsembly/issues/29) | 2, 4 | Authorized retrieval; token budgets; provenance; retention; invalidation |
+| 7 | [MemoryOS context interface](https://github.com/thebakermark/Devsembly/issues/29) — implementation in draft PR #17 | 2, 4 | Authorized retrieval; token budgets; provenance; retention; invalidation |
 | 8 | Recommendations and sprint planning | 4, 6, 7 | Policy filter; readiness; value/risk/cost scoring; explanations |
 | 9 | [Executive dashboard and Genesis template](https://github.com/thebakermark/Devsembly/issues/30) | 6, 8 | Health, delivery, spend, risk, confidence, next work; automatic bootstrap |
 
@@ -33,7 +33,7 @@ scoped agent context, and an evidence-backed executive read model.
 
 ## Compatibility and migration
 
-Revisions `0010_project_intelligence` and `0011_pie_projections` are additive. Existing runtime
-tables are unchanged. The `0011` tables are current read models and can be rebuilt from immutable
-`0010` revisions. A future import command will register `.devsembly/project-state.json` as revision 1
-after a Genesis project ID exists; startup never silently imports repository content.
+Revisions `0010_project_intelligence`, `0011_pie_projections`, and `0015_memory_context` are
+additive. Projection tables remain disposable read models; context packages remain non-authoritative
+manifests. A future import command will register `.devsembly/project-state.json` as revision 1 after
+a Genesis project ID exists; startup never silently imports repository content.

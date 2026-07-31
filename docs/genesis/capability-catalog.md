@@ -18,7 +18,7 @@ does not change capability ownership or imply support without conformance eviden
 | Capability registry | Kernel | Proposed | Static configuration during Genesis |
 | Provider management | Kernel | Proposed | Explicit adapters during Genesis |
 | Domain event delivery | Event capability | Current writer | Transactional outbox writes; publisher planned |
-| Memory and knowledge | Memory capability | Planned | Relational metadata and object evidence first |
+| Memory and knowledge | Memory capability | Current foundation | Typed PostgreSQL proposals, approval, retention filters, and deterministic context packages |
 | Relational database | Data capability | Current scaffold | PostgreSQL and SQLAlchemy |
 | Object storage | Storage capability | Current foundation | MinIO evidence ingestion and verified retrieval |
 | Ephemeral coordination | Cache capability | Current scaffold | Redis, never canonical |

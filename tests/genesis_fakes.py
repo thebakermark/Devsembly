@@ -9,6 +9,7 @@ from typing import Self
 
 from devsembly.domain import (
     Budget,
+    ContextPackage,
     CostEvaluation,
     Decision,
     Evidence,
@@ -17,6 +18,7 @@ from devsembly.domain import (
     OutboxMessage,
     Project,
     ProjectIntelligenceProjection,
+    ProjectMemory,
     ProjectStateRevision,
     WorkflowRun,
     WorkflowStep,
@@ -34,6 +36,8 @@ class MemoryStore:
     project_intelligence_projections: dict[uuid.UUID, ProjectIntelligenceProjection] = field(
         default_factory=dict
     )
+    project_memories: dict[uuid.UUID, ProjectMemory] = field(default_factory=dict)
+    context_packages: dict[uuid.UUID, ContextPackage] = field(default_factory=dict)
     budgets: dict[uuid.UUID, Budget] = field(default_factory=dict)
     cost_evaluations: dict[uuid.UUID, CostEvaluation] = field(default_factory=dict)
     decisions: dict[uuid.UUID, Decision] = field(default_factory=dict)
@@ -234,6 +238,94 @@ class MemoryProjectIntelligenceProjectionRepository:
 
     async def get(self, project_id: uuid.UUID) -> ProjectIntelligenceProjection | None:
         return self.store.project_intelligence_projections.get(project_id)
+
+
+class MemoryProjectMemoryRepository:
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def add(self, memory: ProjectMemory) -> ProjectMemory:
+        if any(
+            item.project_id == memory.project_id and item.content_sha256 == memory.content_sha256
+            for item in self.store.project_memories.values()
+        ):
+            raise DuplicateResourceError("project memory")
+        self.store.project_memories[memory.id] = memory
+        return memory
+
+    async def get(self, project_id: uuid.UUID, memory_id: uuid.UUID) -> ProjectMemory | None:
+        memory = self.store.project_memories.get(memory_id)
+        return memory if memory is not None and memory.project_id == project_id else None
+
+    async def list(self, project_id: uuid.UUID) -> list[ProjectMemory]:
+        return sorted(
+            (
+                item
+                for item in self.store.project_memories.values()
+                if item.project_id == project_id
+            ),
+            key=lambda item: (item.created_at, item.id),
+        )
+
+    async def resolve(
+        self,
+        project_id: uuid.UUID,
+        memory_id: uuid.UUID,
+        expected_version: int,
+        *,
+        status: str,
+        decided_by: str,
+        decision_reason: str,
+        decided_at: datetime,
+    ) -> ProjectMemory | None:
+        current = await self.get(project_id, memory_id)
+        if current is None:
+            return None
+        if current.version != expected_version:
+            raise StaleVersionError("project memory", expected_version)
+        if current.status.value != "proposed":
+            raise InvalidTransitionError("project memory", current.status.value, status)
+        from devsembly.domain import MemoryStatus
+
+        resolved = replace(
+            current,
+            status=MemoryStatus(status),
+            decided_by=decided_by,
+            decision_reason=decision_reason,
+            version=current.version + 1,
+            updated_at=decided_at,
+        )
+        self.store.project_memories[memory_id] = resolved
+        return resolved
+
+
+class MemoryContextPackageRepository:
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def add(self, package: ContextPackage) -> ContextPackage:
+        self.store.context_packages[package.id] = package
+        return package
+
+    async def get(self, project_id: uuid.UUID, package_id: uuid.UUID) -> ContextPackage | None:
+        package = self.store.context_packages.get(package_id)
+        return package if package is not None and package.project_id == project_id else None
+
+    async def invalidate_for_source_change(
+        self, project_id: uuid.UUID, source_revision_id: uuid.UUID, invalidated_at: datetime
+    ) -> int:
+        count = 0
+        for package_id, package in list(self.store.context_packages.items()):
+            if (
+                package.project_id == project_id
+                and package.source_revision_id != source_revision_id
+                and package.invalidated_at is None
+            ):
+                self.store.context_packages[package_id] = replace(
+                    package, invalidated_at=invalidated_at
+                )
+                count += 1
+        return count
 
 
 class MemoryBudgetRepository:
@@ -575,6 +667,8 @@ class MemoryUnitOfWork:
         self.projects = MemoryProjectRepository(store)
         self.project_state_revisions = MemoryProjectStateRevisionRepository(store)
         self.project_intelligence_projection = MemoryProjectIntelligenceProjectionRepository(store)
+        self.project_memories = MemoryProjectMemoryRepository(store)
+        self.context_packages = MemoryContextPackageRepository(store)
         self.budgets = MemoryBudgetRepository(store)
         self.cost_evaluations = MemoryCostEvaluationRepository(store)
         self.decisions = MemoryDecisionRepository(store)

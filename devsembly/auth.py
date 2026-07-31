@@ -200,6 +200,8 @@ CurrentPrincipal = Annotated[PrincipalContext, Depends(authenticated_principal)]
 
 
 def required_permission(request: Request) -> Permission:
+    if request.url.path.endswith("/memory/context"):
+        return Permission.READ
     if (
         request.url.path.endswith("/approve")
         or request.url.path.endswith("/reject")

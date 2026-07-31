@@ -1,6 +1,6 @@
 # Devsembly Genesis Library
 
-**Library version:** 0.1.7
+**Library version:** 0.1.8
 **Status:** Active foundation
 **North Star:** **Engineer organizations that learn faster than the world changes.**
 
@@ -62,6 +62,7 @@ an accepted ADR and implementation evidence say otherwise.
 | [Cost Governance API v1](cost-governance-api.md) | Current cost evaluation, budget recommendation, and decision-record contract |
 | [Evidence API v1](evidence-api.md) | Current immutable ingestion, authorized retrieval, integrity, and retention contract |
 | [Project Intelligence API v1](project-intelligence-api.md) | Current immutable project-state contract plus rebuildable work, alias, and graph projections |
+| [Memory and Context API v1](memory-context-api.md) | Current typed memory proposals, governed approval, and deterministic context packages |
 | [GitHub Synchronization API](github-synchronization-api.md) | Signed event ingestion, delivery deduplication, freshness, conflicts, and recovery |
 | [Capability catalog](capability-catalog.md) | Capability ownership, maturity, and provider boundaries |
 | [Traceability matrix](traceability-matrix.md) | Requirements-to-decision-to-evidence mapping |
@@ -83,6 +84,7 @@ an accepted ADR and implementation evidence say otherwise.
 
 | Version | Date | Change |
 |---|---|---|
+| 0.1.8 | 2026-07-31 | Added governed typed memory proposals and token-budgeted project context |
 | 0.1.7 | 2026-07-31 | Added GitHub event ingestion and durable reconciliation state |
 | 0.1.6 | 2026-07-31 | Added canonical work items, provider aliases, capability/dependency projections, and rebuild recovery |
 | 0.1.5 | 2026-07-31 | Added Project Intelligence architecture, canonical state schema, and immutable revision API |

@@ -315,6 +315,32 @@
           "external_id": "27",
           "uri": "https://github.com/thebakermark/Devsembly/issues/27"
         }]
+      },
+      {
+        "id": "task:pie-29",
+        "title": "Governed MemoryOS project context",
+        "status": "active",
+        "parent_id": "epic:project-intelligence",
+        "provenance": {
+          "provider": "github",
+          "kind": "implementation-issue",
+          "external_id": "29",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/29",
+          "occurred_at": "2026-07-31T15:07:40Z",
+          "observed_at": "2026-07-31T23:00:00Z"
+        },
+        "confidence": {
+          "score": 0.8,
+          "status": "verified",
+          "explanation": "Typed memory proposals, approval, deterministic context assembly, retention and sensitivity filters, invalidation, persistence, and local tests are implemented; full CI remains pending."
+        },
+        "aliases": [{
+          "provider": "github",
+          "account": "thebakermark/Devsembly",
+          "kind": "issue",
+          "external_id": "29",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/29"
+        }]
       }
     ],
     "current_sprint": null
@@ -322,6 +348,28 @@
   "validation": {
     "status": "passed",
     "results": [
+      {
+        "id": "validation:memory-context-local",
+        "title": "Memory and Context API local gates",
+        "status": "passed",
+        "kind": "validation-suite",
+        "evidence_ids": ["evidence:local-issue-29"],
+        "acceptance_criterion_ids": ["criterion:issue-29"],
+        "affected_capability_ids": ["capability:project-intelligence"],
+        "provenance": {
+          "provider": "repository",
+          "kind": "local-validation",
+          "external_id": "issue-29-memory-context",
+          "uri": null,
+          "occurred_at": "2026-07-31T23:00:00Z",
+          "observed_at": "2026-07-31T23:00:00Z"
+        },
+        "confidence": {
+          "score": 0.8,
+          "status": "verified",
+          "explanation": "Ruff, strict MyPy, focused API tests, schema validation, and migration inspection passed locally; PostgreSQL, Docker, Compose, and live-stack gates await CI."
+        }
+      },
       {
         "id": "validation:pie-assurance-projections",
         "title": "PIE assurance projection local gates",
@@ -421,7 +469,27 @@
   },
   "risks": [],
   "technical_debt": [],
-  "memory": [],
+  "memory": [
+    {
+      "id": "memory:governed-context-builder",
+      "title": "Governed Context Builder implementation",
+      "status": "active",
+      "kind": "procedural",
+      "provenance": {
+        "provider": "repository",
+        "kind": "implementation",
+        "external_id": "devsembly/memory_service.py",
+        "uri": null,
+        "occurred_at": null,
+        "observed_at": "2026-07-31T23:00:00Z"
+      },
+      "confidence": {
+        "score": 0.8,
+        "status": "verified",
+        "explanation": "The local implementation and focused tests pass; full CI remains pending."
+      }
+    }
+  ],
   "recommendations": [],
   "forecast": {
     "completion": null,

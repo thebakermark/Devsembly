@@ -64,3 +64,7 @@ identifiers must resolve inside that project projection, and responses expose ev
 rather than evidence contents. Evidence content remains behind the separately authorized evidence
 API. Migration `0014_pie_assurance` adds durable JSONB projection caches; rebuilds derive them from
 the selected immutable project-state revision.
+
+The governed agent-facing retrieval surface is documented separately in the
+[Memory and Context API](memory-context-api.md). Context packages cite this revision log and never
+overwrite it.

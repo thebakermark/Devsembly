@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
@@ -14,6 +14,7 @@ from devsembly import models
 from devsembly.domain import (
     Budget,
     BudgetEnforcementMode,
+    ContextPackage,
     CostCadence,
     CostEvaluation,
     CostEvaluationOutcome,
@@ -28,6 +29,9 @@ from devsembly.domain import (
     EvidenceRetentionClass,
     Initiative,
     InitiativeStatus,
+    MemoryKind,
+    MemorySensitivity,
+    MemoryStatus,
     Organization,
     OutboxMessage,
     Project,
@@ -35,6 +39,7 @@ from devsembly.domain import (
     ProjectGraphKind,
     ProjectGraphNode,
     ProjectIntelligenceProjection,
+    ProjectMemory,
     ProjectProjectionCheckpoint,
     ProjectProviderAlias,
     ProjectStateAssertionStatus,
@@ -109,6 +114,49 @@ def _project_state_revision(model: models.ProjectStateRevision) -> ProjectStateR
         assertion_status=ProjectStateAssertionStatus(model.assertion_status),
         confidence=model.confidence,
         confidence_explanation=model.confidence_explanation,
+        created_at=model.created_at,
+    )
+
+
+def _project_memory(model: models.ProjectMemory) -> ProjectMemory:
+    return ProjectMemory(
+        id=model.id,
+        project_id=model.project_id,
+        kind=MemoryKind(model.kind),
+        title=model.title,
+        content=model.content,
+        content_sha256=model.content_sha256,
+        status=MemoryStatus(model.status),
+        sensitivity=MemorySensitivity(model.sensitivity),
+        source_revision_id=model.source_revision_id,
+        source_uri=model.source_uri,
+        assertion_status=ProjectStateAssertionStatus(model.assertion_status),
+        confidence=model.confidence,
+        retention_until=model.retention_until,
+        superseded_by=model.superseded_by,
+        invalidated_at=model.invalidated_at,
+        proposed_by=model.proposed_by,
+        decided_by=model.decided_by,
+        decision_reason=model.decision_reason,
+        version=model.version,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+    )
+
+
+def _context_package(model: models.ContextPackage) -> ContextPackage:
+    return ContextPackage(
+        id=model.id,
+        project_id=model.project_id,
+        source_revision_id=model.source_revision_id,
+        task=model.task,
+        token_budget=model.token_budget,
+        tokens_used=model.tokens_used,
+        items=tuple(model.items),
+        omissions=tuple(model.omissions),
+        manifest_sha256=model.manifest_sha256,
+        invalidated_at=model.invalidated_at,
+        created_by=model.created_by,
         created_at=model.created_at,
     )
 
@@ -864,6 +912,148 @@ class SqlAlchemyProjectIntelligenceProjectionRepository:
             risks=assurance.risks,
             technical_debt=assurance.technical_debt,
         )
+
+
+class SqlAlchemyProjectMemoryRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, memory: ProjectMemory) -> ProjectMemory:
+        self._session.add(
+            models.ProjectMemory(
+                id=memory.id,
+                project_id=memory.project_id,
+                kind=memory.kind.value,
+                title=memory.title,
+                content=memory.content,
+                content_sha256=memory.content_sha256,
+                status=memory.status.value,
+                sensitivity=memory.sensitivity.value,
+                source_revision_id=memory.source_revision_id,
+                source_uri=memory.source_uri,
+                assertion_status=memory.assertion_status.value,
+                confidence=memory.confidence,
+                retention_until=memory.retention_until,
+                superseded_by=memory.superseded_by,
+                invalidated_at=memory.invalidated_at,
+                proposed_by=memory.proposed_by,
+                decided_by=memory.decided_by,
+                decision_reason=memory.decision_reason,
+                version=memory.version,
+                created_at=memory.created_at,
+                updated_at=memory.updated_at,
+            )
+        )
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            raise DuplicateResourceError("project memory") from exc
+        return memory
+
+    async def get(self, project_id: uuid.UUID, memory_id: uuid.UUID) -> ProjectMemory | None:
+        model = await self._session.scalar(
+            select(models.ProjectMemory).where(
+                models.ProjectMemory.project_id == project_id,
+                models.ProjectMemory.id == memory_id,
+            )
+        )
+        return None if model is None else _project_memory(model)
+
+    async def list(self, project_id: uuid.UUID) -> Sequence[ProjectMemory]:
+        result = await self._session.scalars(
+            select(models.ProjectMemory)
+            .where(models.ProjectMemory.project_id == project_id)
+            .order_by(models.ProjectMemory.created_at, models.ProjectMemory.id)
+        )
+        return [_project_memory(model) for model in result]
+
+    async def resolve(
+        self,
+        project_id: uuid.UUID,
+        memory_id: uuid.UUID,
+        expected_version: int,
+        *,
+        status: str,
+        decided_by: str,
+        decision_reason: str,
+        decided_at: datetime,
+    ) -> ProjectMemory | None:
+        result = await self._session.scalar(
+            update(models.ProjectMemory)
+            .where(
+                models.ProjectMemory.project_id == project_id,
+                models.ProjectMemory.id == memory_id,
+                models.ProjectMemory.version == expected_version,
+                models.ProjectMemory.status == "proposed",
+            )
+            .values(
+                status=status,
+                decided_by=decided_by,
+                decision_reason=decision_reason,
+                version=expected_version + 1,
+                updated_at=decided_at,
+            )
+            .returning(models.ProjectMemory)
+        )
+        if result is not None:
+            return _project_memory(result)
+        current = await self.get(project_id, memory_id)
+        if current is None:
+            return None
+        if current.version != expected_version:
+            raise StaleVersionError("project memory", expected_version)
+        raise InvalidTransitionError("project memory", current.status.value, status)
+
+
+class SqlAlchemyContextPackageRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, package: ContextPackage) -> ContextPackage:
+        self._session.add(
+            models.ContextPackage(
+                id=package.id,
+                project_id=package.project_id,
+                source_revision_id=package.source_revision_id,
+                task=package.task,
+                token_budget=package.token_budget,
+                tokens_used=package.tokens_used,
+                items=list(package.items),
+                omissions=list(package.omissions),
+                manifest_sha256=package.manifest_sha256,
+                invalidated_at=package.invalidated_at,
+                created_by=package.created_by,
+                created_at=package.created_at,
+            )
+        )
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            raise DuplicateResourceError("context package") from exc
+        return package
+
+    async def get(self, project_id: uuid.UUID, package_id: uuid.UUID) -> ContextPackage | None:
+        model = await self._session.scalar(
+            select(models.ContextPackage).where(
+                models.ContextPackage.project_id == project_id,
+                models.ContextPackage.id == package_id,
+            )
+        )
+        return None if model is None else _context_package(model)
+
+    async def invalidate_for_source_change(
+        self, project_id: uuid.UUID, source_revision_id: uuid.UUID, invalidated_at: datetime
+    ) -> int:
+        result = await self._session.execute(
+            update(models.ContextPackage)
+            .where(
+                models.ContextPackage.project_id == project_id,
+                models.ContextPackage.source_revision_id != source_revision_id,
+                models.ContextPackage.invalidated_at.is_(None),
+            )
+            .values(invalidated_at=invalidated_at)
+        )
+        return cast(int, cast(Any, result).rowcount)
 
 
 class SqlAlchemyBudgetRepository:

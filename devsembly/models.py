@@ -296,6 +296,92 @@ class ProjectIntelligenceProjection(Base):
     )
 
 
+class ProjectMemory(Base):
+    __tablename__ = "project_memories"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('working', 'episodic', 'semantic', 'procedural', 'reflection')",
+            name="ck_project_memories_kind",
+        ),
+        CheckConstraint(
+            "status IN ('proposed', 'approved', 'rejected')",
+            name="ck_project_memories_status",
+        ),
+        CheckConstraint(
+            "sensitivity IN ('public', 'internal', 'confidential', 'restricted')",
+            name="ck_project_memories_sensitivity",
+        ),
+        CheckConstraint(
+            "assertion_status IN ('verified', 'inferred', 'disputed')",
+            name="ck_project_memories_assertion",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1", name="ck_project_memories_confidence"
+        ),
+        CheckConstraint("version > 0", name="ck_project_memories_version"),
+        UniqueConstraint("project_id", "content_sha256", name="uq_project_memory_content"),
+        Index("ix_project_memories_retrieval", "project_id", "status", "kind"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    sensitivity: Mapped[str] = mapped_column(String(20), nullable=False)
+    source_revision_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("project_state_revisions.id", ondelete="SET NULL")
+    )
+    source_uri: Mapped[str | None] = mapped_column(String(1000))
+    assertion_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
+    retention_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    superseded_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("project_memories.id", ondelete="SET NULL")
+    )
+    invalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    proposed_by: Mapped[str] = mapped_column(String(200), nullable=False)
+    decided_by: Mapped[str | None] = mapped_column(String(200))
+    decision_reason: Mapped[str | None] = mapped_column(Text)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ContextPackage(Base):
+    __tablename__ = "context_packages"
+    __table_args__ = (
+        CheckConstraint("token_budget > 0", name="ck_context_packages_budget"),
+        CheckConstraint(
+            "tokens_used >= 0 AND tokens_used <= token_budget", name="ck_context_packages_usage"
+        ),
+        Index("ix_context_packages_project_created", "project_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    source_revision_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_state_revisions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    task: Mapped[str] = mapped_column(Text, nullable=False)
+    token_budget: Mapped[int] = mapped_column(Integer, nullable=False)
+    tokens_used: Mapped[int] = mapped_column(Integer, nullable=False)
+    items: Mapped[list[dict[str, object]]] = mapped_column(JSONB, nullable=False)
+    omissions: Mapped[list[dict[str, object]]] = mapped_column(JSONB, nullable=False)
+    manifest_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    invalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class GitHubDelivery(Base):
     __tablename__ = "github_deliveries"
     __table_args__ = (

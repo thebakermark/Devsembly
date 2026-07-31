@@ -113,6 +113,27 @@ class ProjectGraphKind(StrEnum):
     DEPENDENCY = "dependency"
 
 
+class MemoryKind(StrEnum):
+    WORKING = "working"
+    EPISODIC = "episodic"
+    SEMANTIC = "semantic"
+    PROCEDURAL = "procedural"
+    REFLECTION = "reflection"
+
+
+class MemoryStatus(StrEnum):
+    PROPOSED = "proposed"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class MemorySensitivity(StrEnum):
+    PUBLIC = "public"
+    INTERNAL = "internal"
+    CONFIDENTIAL = "confidential"
+    RESTRICTED = "restricted"
+
+
 @dataclass(frozen=True, slots=True)
 class Organization:
     id: uuid.UUID
@@ -325,6 +346,47 @@ class ProjectStateRevision:
     assertion_status: ProjectStateAssertionStatus
     confidence: Decimal
     confidence_explanation: str
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectMemory:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    kind: MemoryKind
+    title: str
+    content: str
+    content_sha256: str
+    status: MemoryStatus
+    sensitivity: MemorySensitivity
+    source_revision_id: uuid.UUID | None
+    source_uri: str | None
+    assertion_status: ProjectStateAssertionStatus
+    confidence: Decimal
+    retention_until: datetime | None
+    superseded_by: uuid.UUID | None
+    invalidated_at: datetime | None
+    proposed_by: str
+    decided_by: str | None
+    decision_reason: str | None
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ContextPackage:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    source_revision_id: uuid.UUID
+    task: str
+    token_budget: int
+    tokens_used: int
+    items: tuple[dict[str, object], ...]
+    omissions: tuple[dict[str, object], ...]
+    manifest_sha256: str
+    invalidated_at: datetime | None
+    created_by: str
     created_at: datetime
 
 

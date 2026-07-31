@@ -21,6 +21,9 @@ from devsembly.domain import (
     DecisionRisk,
     DecisionStatus,
     InitiativeStatus,
+    MemoryKind,
+    MemorySensitivity,
+    MemoryStatus,
     Organization,
     OutboxMessage,
     ProjectStateAssertionStatus,
@@ -38,6 +41,7 @@ from devsembly.errors import (
     StaleVersionError,
 )
 from devsembly.genesis_service import GenesisService
+from devsembly.memory_service import MemoryContextService
 from devsembly.pie_service import ProjectIntelligenceService
 from devsembly.unit_of_work import SqlAlchemyUnitOfWork
 from devsembly.workflow_service import WorkflowService
@@ -293,6 +297,125 @@ async def test_project_intelligence_revisions_are_atomic_and_idempotent(
     assert projection is not None and projection.source_revision_id == first.id
     assert work_item_count == 1
     assert alias_count == 1
+
+
+async def test_memory_context_persists_approval_manifest_and_source_invalidation(
+    postgres_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    factory = lambda: SqlAlchemyUnitOfWork(postgres_factory)
+    genesis = GenesisService(factory)
+    pie = ProjectIntelligenceService(factory)
+    memory = MemoryContextService(factory)
+    organization = await genesis.create_organization("MemoryOS")
+    initiative = await genesis.create_initiative(
+        organization.id,
+        name="Genesis",
+        objective="Persist governed agent context.",
+        status=InitiativeStatus.ACTIVE,
+    )
+    project = await genesis.create_project(
+        organization.id,
+        initiative.id,
+        name="Context Builder",
+        repository="thebakermark/Devsembly",
+        status=ProjectStatus.ACTIVE,
+    )
+    first_revision = await pie.reconcile(
+        organization.id,
+        initiative.id,
+        project.id,
+        expected_version=0,
+        idempotency_key="memory-context-postgres-v1",
+        schema_version="1.0",
+        state={"vision": {"text": "Build governed context."}},
+        source_provider="repository",
+        source_kind="project-state",
+        source_event_id="v1",
+        source_uri=".devsembly/project-state.json",
+        source_occurred_at=None,
+        assertion_status=ProjectStateAssertionStatus.VERIFIED,
+        confidence=Decimal("1.0000"),
+        confidence_explanation="Canonical repository state.",
+    )
+    proposal = await memory.propose(
+        organization.id,
+        initiative.id,
+        project.id,
+        kind=MemoryKind.PROCEDURAL,
+        title="Validation procedure",
+        content="Run all locked validation gates.",
+        sensitivity=MemorySensitivity.INTERNAL,
+        source_revision_id=first_revision.id,
+        source_uri="docs/genesis/memory-context-api.md",
+        assertion_status=ProjectStateAssertionStatus.VERIFIED,
+        confidence=Decimal("1.0000"),
+        retention_until=None,
+        proposed_by="principal:proposer",
+    )
+    approved = await memory.resolve(
+        organization.id,
+        initiative.id,
+        project.id,
+        proposal.id,
+        1,
+        status=MemoryStatus.APPROVED,
+        decided_by="principal:approver",
+        reason="Procedure verified against repository policy.",
+    )
+    package = await memory.build_context(
+        organization.id,
+        initiative.id,
+        project.id,
+        task="Validate the Context Builder",
+        token_budget=4096,
+        created_by="principal:agent",
+    )
+    restored = await MemoryContextService(factory).get_context(
+        organization.id, initiative.id, project.id, package.id
+    )
+    assert approved.status is MemoryStatus.APPROVED
+    assert restored.manifest_sha256 == package.manifest_sha256
+    assert any(item["authority"] == "approved_memory" for item in restored.items)
+
+    await pie.reconcile(
+        organization.id,
+        initiative.id,
+        project.id,
+        expected_version=1,
+        idempotency_key="memory-context-postgres-v2",
+        schema_version="1.0",
+        state={"vision": {"text": "Build governed, restart-safe context."}},
+        source_provider="repository",
+        source_kind="project-state",
+        source_event_id="v2",
+        source_uri=".devsembly/project-state.json",
+        source_occurred_at=None,
+        assertion_status=ProjectStateAssertionStatus.VERIFIED,
+        confidence=Decimal("1.0000"),
+        confidence_explanation="Canonical repository state changed.",
+    )
+    await memory.build_context(
+        organization.id,
+        initiative.id,
+        project.id,
+        task="Validate the Context Builder",
+        token_budget=4096,
+        created_by="principal:agent",
+    )
+    invalidated = await memory.get_context(organization.id, initiative.id, project.id, package.id)
+    assert invalidated.invalidated_at is not None
+
+    async with postgres_factory() as session:
+        memory_count = await session.scalar(select(func.count()).select_from(models.ProjectMemory))
+        package_count = await session.scalar(
+            select(func.count()).select_from(models.ContextPackage)
+        )
+        context_event_count = await session.scalar(
+            select(func.count()).where(models.OutboxEvent.topic == "genesis.context.built")
+        )
+    assert memory_count == 1
+    assert package_count == 2
+    assert context_event_count == 2
 
 
 async def test_concurrent_identical_workflow_creates_return_one_run(

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from devsembly.database import SessionFactory
 from devsembly.repositories import (
     BudgetRepository,
+    ContextPackageRepository,
     CostEvaluationRepository,
     DecisionRepository,
     EvidenceRepository,
@@ -15,6 +16,7 @@ from devsembly.repositories import (
     OrganizationRepository,
     OutboxRepository,
     ProjectIntelligenceProjectionRepository,
+    ProjectMemoryRepository,
     ProjectRepository,
     ProjectStateRevisionRepository,
     WorkflowRunRepository,
@@ -23,6 +25,7 @@ from devsembly.repositories import (
 )
 from devsembly.sqlalchemy_repositories import (
     SqlAlchemyBudgetRepository,
+    SqlAlchemyContextPackageRepository,
     SqlAlchemyCostEvaluationRepository,
     SqlAlchemyDecisionRepository,
     SqlAlchemyEvidenceRepository,
@@ -30,6 +33,7 @@ from devsembly.sqlalchemy_repositories import (
     SqlAlchemyOrganizationRepository,
     SqlAlchemyOutboxRepository,
     SqlAlchemyProjectIntelligenceProjectionRepository,
+    SqlAlchemyProjectMemoryRepository,
     SqlAlchemyProjectRepository,
     SqlAlchemyProjectStateRevisionRepository,
     SqlAlchemyWorkflowRunRepository,
@@ -53,6 +57,12 @@ class UnitOfWork(Protocol):
 
     @property
     def project_intelligence_projection(self) -> ProjectIntelligenceProjectionRepository: ...
+
+    @property
+    def project_memories(self) -> ProjectMemoryRepository: ...
+
+    @property
+    def context_packages(self) -> ContextPackageRepository: ...
 
     @property
     def budgets(self) -> BudgetRepository: ...
@@ -125,6 +135,14 @@ class SqlAlchemyUnitOfWork:
     @property
     def project_intelligence_projection(self) -> ProjectIntelligenceProjectionRepository:
         return SqlAlchemyProjectIntelligenceProjectionRepository(self._active_session())
+
+    @property
+    def project_memories(self) -> ProjectMemoryRepository:
+        return SqlAlchemyProjectMemoryRepository(self._active_session())
+
+    @property
+    def context_packages(self) -> ContextPackageRepository:
+        return SqlAlchemyContextPackageRepository(self._active_session())
 
     @property
     def budgets(self) -> BudgetRepository:

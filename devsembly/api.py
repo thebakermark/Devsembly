@@ -28,6 +28,7 @@ from devsembly.github_sync_api import conflict_router as github_conflict_router
 from devsembly.github_sync_api import router as github_sync_router
 from devsembly.identity_api import organization_router as identity_organization_router
 from devsembly.identity_api import router as identity_router
+from devsembly.memory_api import router as memory_router
 from devsembly.outbox_publisher import worker_readiness
 from devsembly.pie_api import router as pie_router
 from devsembly.workflow_api import internal_router as workflow_internal_router
@@ -43,6 +44,7 @@ app.include_router(identity_router)
 app.include_router(identity_organization_router)
 app.include_router(evidence_router)
 app.include_router(pie_router)
+app.include_router(memory_router)
 app.include_router(github_sync_router)
 app.include_router(github_conflict_router)
 

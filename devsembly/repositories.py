@@ -8,6 +8,7 @@ from typing import Protocol
 
 from devsembly.domain import (
     Budget,
+    ContextPackage,
     CostEvaluation,
     Decision,
     Evidence,
@@ -16,6 +17,7 @@ from devsembly.domain import (
     OutboxMessage,
     Project,
     ProjectIntelligenceProjection,
+    ProjectMemory,
     ProjectStateRevision,
     WorkflowRun,
     WorkflowStep,
@@ -95,6 +97,36 @@ class ProjectIntelligenceProjectionRepository(Protocol):
     async def replace(self, projection: ProjectIntelligenceProjection) -> None: ...
 
     async def get(self, project_id: uuid.UUID) -> ProjectIntelligenceProjection | None: ...
+
+
+class ProjectMemoryRepository(Protocol):
+    async def add(self, memory: ProjectMemory) -> ProjectMemory: ...
+
+    async def get(self, project_id: uuid.UUID, memory_id: uuid.UUID) -> ProjectMemory | None: ...
+
+    async def list(self, project_id: uuid.UUID) -> Sequence[ProjectMemory]: ...
+
+    async def resolve(
+        self,
+        project_id: uuid.UUID,
+        memory_id: uuid.UUID,
+        expected_version: int,
+        *,
+        status: str,
+        decided_by: str,
+        decision_reason: str,
+        decided_at: datetime,
+    ) -> ProjectMemory | None: ...
+
+
+class ContextPackageRepository(Protocol):
+    async def add(self, package: ContextPackage) -> ContextPackage: ...
+
+    async def get(self, project_id: uuid.UUID, package_id: uuid.UUID) -> ContextPackage | None: ...
+
+    async def invalidate_for_source_change(
+        self, project_id: uuid.UUID, source_revision_id: uuid.UUID, invalidated_at: datetime
+    ) -> int: ...
 
 
 class BudgetRepository(Protocol):
