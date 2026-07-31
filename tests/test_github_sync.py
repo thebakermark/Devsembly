@@ -10,6 +10,7 @@ from devsembly.github_sync import (
     InvalidGitHubEvent,
     InvalidGitHubSignature,
     normalize_event,
+    normalize_snapshot_entity,
     verify_signature,
 )
 
@@ -59,3 +60,29 @@ def test_normalization_rejects_events_without_repository_or_entity_identity() ->
     body = json.dumps({"repository": {"id": 991}, "issue": {"title": "missing id"}}).encode()
     with pytest.raises(InvalidGitHubEvent):
         normalize_event(body, "delivery-1", "issues")
+
+
+def test_snapshot_normalization_is_retry_safe_and_uses_provider_identity() -> None:
+    entity = {
+        "id": 2600,
+        "node_id": "I_kw26",
+        "number": 26,
+        "title": "Synchronize GitHub",
+        "updated_at": "2026-07-31T17:00:00Z",
+    }
+    first = normalize_snapshot_entity("991", "issue", entity)
+    replay = normalize_snapshot_entity("991", "issue", entity)
+    assert first.delivery_id == replay.delivery_id
+    assert first.delivery_id.startswith("snapshot:991:")
+    assert first.entity_id == "github:991:issue:I_kw26"
+
+
+def test_snapshot_normalization_changes_delivery_when_facts_change() -> None:
+    original = normalize_snapshot_entity(
+        "991", "milestone", {"id": 32, "title": "PIE", "updated_at": "2026-07-31T17:00:00Z"}
+    )
+    changed = normalize_snapshot_entity(
+        "991", "milestone", {"id": 32, "title": "PIE v2", "updated_at": "2026-07-31T18:00:00Z"}
+    )
+    assert original.entity_id == changed.entity_id
+    assert original.delivery_id != changed.delivery_id

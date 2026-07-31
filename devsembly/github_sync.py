@@ -51,6 +51,16 @@ class IngestionResult:
     reconciliation_required: bool
 
 
+@dataclass(frozen=True, slots=True)
+class SnapshotReconciliationResult:
+    repository_id: str
+    processed: int
+    duplicates: int
+    conflicts: int
+    out_of_order: int
+    stale_sources: int
+
+
 def verify_signature(body: bytes, signature: str | None, secret: str) -> None:
     if not secret:
         raise InvalidGitHubSignature("GitHub webhook secret is not configured")
@@ -153,13 +163,31 @@ class GitHubSynchronizationService:
                     models.GitHubDelivery.delivery_id == event.delivery_id,
                 )
             )
-            existing_snapshot = (
-                None
-                if existing is None
-                else (existing.entity_id, existing.status, existing.out_of_order)
-            )
+            existing_snapshot = None
+            if existing is not None:
+                if (
+                    existing.project_id != project_id
+                    or existing.payload_sha256 != event.payload_sha256
+                ):
+                    raise InvalidGitHubEvent(
+                        "GitHub delivery identity was already used for different content"
+                    )
+                source = await session.scalar(
+                    select(models.GitHubSourceState).where(
+                        models.GitHubSourceState.project_id == project_id,
+                        models.GitHubSourceState.entity_id == existing.entity_id,
+                    )
+                )
+                existing_snapshot = (
+                    existing.entity_id,
+                    existing.status,
+                    existing.out_of_order,
+                    bool(source and source.reconciliation_required),
+                )
         if existing_snapshot is not None:
-            entity_id, existing_status, existing_out_of_order = existing_snapshot
+            entity_id, existing_status, existing_out_of_order, reconciliation_required = (
+                existing_snapshot
+            )
             if existing_status != "processed":
                 return await self._process(project_id, event, authority, now)
             return IngestionResult(
@@ -169,7 +197,7 @@ class GitHubSynchronizationService:
                 True,
                 existing_out_of_order,
                 None,
-                existing_out_of_order,
+                reconciliation_required,
             )
 
         async with self._session_factory() as session:
@@ -236,7 +264,10 @@ class GitHubSynchronizationService:
                 not out_of_order and _AUTHORITY[authority] >= _AUTHORITY[source.authority]
             )
             if source and source.payload_sha256 != event.payload_sha256:
-                same_position = source.provider_occurred_at == event.occurred_at
+                same_position = (
+                    source.provider_occurred_at == event.occurred_at
+                    and source.authority == authority
+                )
                 protected = _AUTHORITY[authority] < _AUTHORITY[source.authority]
                 if same_position or protected:
                     conflict = models.GitHubReconciliationConflict(
@@ -341,3 +372,111 @@ class GitHubSynchronizationService:
     async def retry(self, project_id: uuid.UUID, event: NormalizedGitHubEvent) -> IngestionResult:
         """Resume a received/failed delivery after a partial failure without reinserting it."""
         return await self._process(project_id, event, "verified", datetime.now(UTC))
+
+    async def reconcile_snapshot(
+        self,
+        project_id: uuid.UUID,
+        repository_id: str,
+        events: list[NormalizedGitHubEvent],
+        *,
+        observed_at: datetime | None = None,
+    ) -> SnapshotReconciliationResult:
+        """Apply a provider snapshot with stable, retry-safe synthetic delivery identities.
+
+        Each entity commits independently. A provider outage can therefore resume the same page
+        without replaying successful mutations, while ordinary event ordering and authority rules
+        remain shared with webhook ingestion.
+        """
+        now = observed_at or datetime.now(UTC)
+        if any(event.repository_id != repository_id for event in events):
+            raise InvalidGitHubEvent("snapshot entities must belong to the requested repository")
+        processed = duplicates = conflicts = out_of_order = 0
+        for event in events:
+            result = await self.ingest(project_id, event, authority="verified", observed_at=now)
+            processed += 1
+            duplicates += int(result.duplicate)
+            conflicts += int(result.conflict_id is not None)
+            out_of_order += int(result.out_of_order)
+        return SnapshotReconciliationResult(
+            repository_id=repository_id,
+            processed=processed,
+            duplicates=duplicates,
+            conflicts=conflicts,
+            out_of_order=out_of_order,
+            stale_sources=await self.mark_stale_sources(project_id, repository_id, now=now),
+        )
+
+    async def mark_stale_sources(
+        self,
+        project_id: uuid.UUID,
+        repository_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> int:
+        """Flag expired provider state for snapshot repair without changing canonical facts."""
+        checked_at = now or datetime.now(UTC)
+        async with self._session_factory() as session:
+            sources = list(
+                (
+                    await session.scalars(
+                        select(models.GitHubSourceState)
+                        .where(
+                            models.GitHubSourceState.project_id == project_id,
+                            models.GitHubSourceState.repository_id == repository_id,
+                            models.GitHubSourceState.stale_after <= checked_at,
+                        )
+                        .with_for_update()
+                    )
+                ).all()
+            )
+            newly_stale = [source for source in sources if not source.reconciliation_required]
+            for source in sources:
+                source.reconciliation_required = True
+            if newly_stale:
+                event_id = uuid.uuid4()
+                payload: dict[str, object] = {
+                    "project_id": str(project_id),
+                    "repository_id": repository_id,
+                    "entity_ids": [source.entity_id for source in newly_stale],
+                    "stale_count": len(newly_stale),
+                }
+                session.add(
+                    models.OutboxEvent(
+                        id=event_id,
+                        occurred_at=checked_at,
+                        topic="genesis.project-intelligence.github-sources-stale",
+                        aggregate_id=f"github:{repository_id}",
+                        payload=payload,
+                        available_at=checked_at,
+                    )
+                )
+                session.add(
+                    models.AuditEvent(
+                        id=uuid.uuid4(),
+                        occurred_at=checked_at,
+                        actor_type="service",
+                        actor_id="github-snapshot-reconciler",
+                        action="genesis.project-intelligence.github-sources-stale",
+                        object_type="project-intelligence.github-repository",
+                        object_id=f"github:{repository_id}",
+                        project_id=project_id,
+                        correlation_id=str(event_id),
+                        outcome="success",
+                        payload={"event_id": str(event_id), **payload},
+                    )
+                )
+            await session.commit()
+            return len(sources)
+
+
+def normalize_snapshot_entity(
+    repository_id: str,
+    entity_kind: str,
+    entity: dict[str, object],
+) -> NormalizedGitHubEvent:
+    """Normalize one authenticated snapshot entity through the webhook contract."""
+    envelope = {"repository": {"id": repository_id}, entity_kind: entity}
+    canonical = json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode()
+    digest = hashlib.sha256(canonical).hexdigest()
+    event = normalize_event(canonical, f"snapshot:{repository_id}:{digest}", entity_kind)
+    return event

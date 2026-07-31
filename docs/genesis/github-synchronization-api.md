@@ -25,5 +25,16 @@ relying on GitHub redelivery. Failed or received deliveries are retryable; uniqu
 prevent duplicate state and events under concurrent at-least-once delivery.
 
 This slice normalizes Issues, pull requests, reviews, workflow runs/jobs, milestones, checks, refs,
-and commits. Scheduled GitHub snapshot retrieval and Temporal scheduling build on the durable
-reconciliation marker introduced here.
+and commits.
+
+`POST /api/v1/internal/projects/{project_id}/github/snapshot-reconciliations` accepts an
+authenticated provider snapshot page of up to 500 entities. Each entity receives a deterministic
+synthetic delivery ID derived from its canonical provider payload, so retrying a page after a
+timeout is safe. Entities commit independently: a later retry resumes after partial failure without
+duplicating successful audit or outbox records. The service applies the same ordering, authority,
+and conflict rules as webhook ingestion, then flags sources whose freshness deadline has expired.
+Stale detection never changes canonical facts; it emits
+`genesis.project-intelligence.github-sources-stale` once when repair first becomes required.
+
+Temporal scheduling and authenticated GitHub page retrieval remain the provider adapter's
+responsibility; this endpoint is the durable, restart-safe application boundary they call.
