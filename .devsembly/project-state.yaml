@@ -1,5 +1,5 @@
 schema_version: 1
-updated_at: "2026-07-31T15:54:32Z"
+updated_at: "2026-07-31T16:12:32Z"
 repository: thebakermark/Devsembly
 branch: docs/genesis-reference-implementation-plan
 pull_request:
@@ -32,8 +32,8 @@ completed_capabilities:
   - pie-capability-and-dependency-projections
   - pie-projection-rebuild
 validation:
-  latest_head: 0a6705d1c22a394ee60f42d36f249b91e46c9e02
-  latest_ci_run: 50
+  latest_head: 873903d30c2e3f0e9c5b9401fdf14e68c33129df
+  latest_ci_run: 53
   status: passed
 open_issues:
   milestone: 32
