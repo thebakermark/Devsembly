@@ -1,4 +1,4 @@
-<!-- GENERATED FILE: edit .devsembly/project-state.json, not this file. -->
+<!-- GENERATED FILE: edit .devsembly/product-definition.json, not this file. -->
 # Devsembly Product Definition
 
 **Stable ID:** `platform:software-delivery`  
