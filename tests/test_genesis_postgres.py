@@ -195,6 +195,38 @@ async def test_project_intelligence_revisions_are_atomic_and_idempotent(
         repository="thebakermark/Devsembly",
         status=ProjectStatus.ACTIVE,
     )
+    state: dict[str, object] = {
+        "project": {"id": "project:devsembly", "status": "active"},
+        "planning": {
+            "tasks": [
+                {
+                    "id": "task:25",
+                    "title": "Project PIE work items",
+                    "status": "active",
+                    "provenance": {
+                        "provider": "github",
+                        "kind": "issue",
+                        "external_id": "25",
+                        "uri": "https://github.com/thebakermark/Devsembly/issues/25",
+                        "observed_at": "2026-07-31T00:00:00Z",
+                    },
+                    "confidence": {
+                        "score": 1,
+                        "status": "verified",
+                        "explanation": "Authenticated GitHub state.",
+                    },
+                    "aliases": [
+                        {
+                            "provider": "github",
+                            "account": "thebakermark/Devsembly",
+                            "kind": "issue",
+                            "external_id": "25",
+                        }
+                    ],
+                }
+            ]
+        },
+    }
 
     first = await pie.reconcile(
         organization.id,
@@ -203,7 +235,7 @@ async def test_project_intelligence_revisions_are_atomic_and_idempotent(
         expected_version=0,
         idempotency_key="github:pr:17:c077ce0",
         schema_version="1.0",
-        state={"project": {"id": "project:devsembly", "status": "active"}},
+        state=state,
         source_provider="github",
         source_kind="pull_request",
         source_event_id="c077ce0",
@@ -220,7 +252,7 @@ async def test_project_intelligence_revisions_are_atomic_and_idempotent(
         expected_version=0,
         idempotency_key="github:pr:17:c077ce0",
         schema_version="1.0",
-        state={"project": {"id": "project:devsembly", "status": "active"}},
+        state=state,
         source_provider="github",
         source_kind="pull_request",
         source_event_id="c077ce0",
@@ -246,9 +278,19 @@ async def test_project_intelligence_revisions_are_atomic_and_idempotent(
                 models.AuditEvent.action == "genesis.project-intelligence.state-reconciled"
             )
         )
+        projection = await session.get(models.ProjectIntelligenceProjection, project.id)
+        work_item_count = await session.scalar(
+            select(func.count()).select_from(models.ProjectIntelligenceWorkItem)
+        )
+        alias_count = await session.scalar(
+            select(func.count()).select_from(models.ProjectIntelligenceProviderAlias)
+        )
     assert revision_count == 1
     assert event_count == 1
     assert audit_count == 1
+    assert projection is not None and projection.source_revision_id == first.id
+    assert work_item_count == 1
+    assert alias_count == 1
 
 
 async def test_workflow_repositories_persist_scope_idempotency_attempts_and_retry(

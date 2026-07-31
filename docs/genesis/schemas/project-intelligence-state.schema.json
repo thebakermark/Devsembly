@@ -146,6 +146,14 @@
         "id": { "$ref": "#/$defs/stableId" },
         "title": { "$ref": "#/$defs/nonEmpty" },
         "status": { "$ref": "#/$defs/nonEmpty" },
+        "kind": { "$ref": "#/$defs/nonEmpty" },
+        "parent_id": {
+          "anyOf": [{ "$ref": "#/$defs/stableId" }, { "type": "null" }]
+        },
+        "aliases": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/providerAlias" }
+        },
         "provenance": { "$ref": "#/$defs/provenance" },
         "confidence": { "$ref": "#/$defs/confidence" }
       }
@@ -158,7 +166,18 @@
         "id": { "$ref": "#/$defs/stableId" },
         "from": { "$ref": "#/$defs/stableId" },
         "to": { "$ref": "#/$defs/stableId" },
-        "type": { "$ref": "#/$defs/nonEmpty" },
+        "type": {
+          "enum": [
+            "parent_of",
+            "depends_on",
+            "implements",
+            "validates",
+            "evidences",
+            "blocks",
+            "supersedes",
+            "derived_from"
+          ]
+        },
         "provenance": { "$ref": "#/$defs/provenance" },
         "confidence": { "$ref": "#/$defs/confidence" }
       }
@@ -170,6 +189,18 @@
       "properties": {
         "nodes": { "type": "array", "items": { "$ref": "#/$defs/item" } },
         "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } }
+      }
+    },
+    "providerAlias": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "account", "kind", "external_id"],
+      "properties": {
+        "provider": { "$ref": "#/$defs/nonEmpty" },
+        "account": { "$ref": "#/$defs/nonEmpty" },
+        "kind": { "$ref": "#/$defs/nonEmpty" },
+        "external_id": { "$ref": "#/$defs/nonEmpty" },
+        "uri": { "type": ["string", "null"] }
       }
     }
   }

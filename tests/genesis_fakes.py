@@ -16,6 +16,7 @@ from devsembly.domain import (
     Organization,
     OutboxMessage,
     Project,
+    ProjectIntelligenceProjection,
     ProjectStateRevision,
     WorkflowRun,
     WorkflowStep,
@@ -30,6 +31,9 @@ class MemoryStore:
     initiatives: dict[uuid.UUID, Initiative] = field(default_factory=dict)
     projects: dict[uuid.UUID, Project] = field(default_factory=dict)
     project_state_revisions: dict[uuid.UUID, ProjectStateRevision] = field(default_factory=dict)
+    project_intelligence_projections: dict[uuid.UUID, ProjectIntelligenceProjection] = field(
+        default_factory=dict
+    )
     budgets: dict[uuid.UUID, Budget] = field(default_factory=dict)
     cost_evaluations: dict[uuid.UUID, CostEvaluation] = field(default_factory=dict)
     decisions: dict[uuid.UUID, Decision] = field(default_factory=dict)
@@ -219,6 +223,17 @@ class MemoryProjectStateRevisionRepository:
             ),
             key=lambda item: item.version,
         )
+
+
+class MemoryProjectIntelligenceProjectionRepository:
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
+
+    async def replace(self, projection: ProjectIntelligenceProjection) -> None:
+        self.store.project_intelligence_projections[projection.checkpoint.project_id] = projection
+
+    async def get(self, project_id: uuid.UUID) -> ProjectIntelligenceProjection | None:
+        return self.store.project_intelligence_projections.get(project_id)
 
 
 class MemoryBudgetRepository:
@@ -559,6 +574,7 @@ class MemoryUnitOfWork:
         self.initiatives = MemoryInitiativeRepository(store)
         self.projects = MemoryProjectRepository(store)
         self.project_state_revisions = MemoryProjectStateRevisionRepository(store)
+        self.project_intelligence_projection = MemoryProjectIntelligenceProjectionRepository(store)
         self.budgets = MemoryBudgetRepository(store)
         self.cost_evaluations = MemoryCostEvaluationRepository(store)
         self.decisions = MemoryDecisionRepository(store)

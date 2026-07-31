@@ -7,7 +7,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
-from devsembly.domain import ProjectStateAssertionStatus
+from devsembly.domain import ProjectGraphKind, ProjectStateAssertionStatus, ProjectWorkItemKind
 
 NonEmptyText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
@@ -78,3 +78,74 @@ class ProjectStateRevisionRead(BaseModel):
     source: ProjectStateSourceRead
     assertion: ProjectStateAssertionRead
     created_at: datetime
+
+
+class ProjectionRebuild(BaseModel):
+    version: int = Field(ge=1)
+
+
+class ProviderAliasRead(BaseModel):
+    provider: str
+    account: str
+    kind: str
+    external_id: str
+    uri: str | None
+
+
+class ProjectionProvenanceRead(BaseModel):
+    provider: str
+    kind: str
+    external_id: str | None
+    uri: str | None
+    occurred_at: datetime | None
+    observed_at: datetime
+
+
+class ProjectWorkItemRead(BaseModel):
+    id: str
+    kind: ProjectWorkItemKind
+    title: str
+    status: str
+    parent_id: str | None
+    source_revision_id: uuid.UUID
+    provenance: ProjectionProvenanceRead
+    assertion: ProjectStateAssertionRead
+    aliases: list[ProviderAliasRead]
+
+
+class ProjectGraphNodeRead(BaseModel):
+    id: str
+    kind: str
+    title: str
+    status: str
+    source_revision_id: uuid.UUID
+    provenance: ProjectionProvenanceRead
+    assertion: ProjectStateAssertionRead
+    aliases: list[ProviderAliasRead]
+
+
+class ProjectGraphEdgeRead(BaseModel):
+    id: str
+    from_id: str
+    to_id: str
+    relationship: str
+    source_revision_id: uuid.UUID
+    provenance: ProjectionProvenanceRead
+    assertion: ProjectStateAssertionRead
+
+
+class ProjectGraphRead(BaseModel):
+    kind: ProjectGraphKind
+    source_revision_id: uuid.UUID
+    source_version: int
+    nodes: list[ProjectGraphNodeRead]
+    edges: list[ProjectGraphEdgeRead]
+
+
+class ProjectIntelligenceProjectionRead(BaseModel):
+    project_id: uuid.UUID
+    source_revision_id: uuid.UUID
+    source_version: int
+    rebuilt_at: datetime
+    work_items: list[ProjectWorkItemRead]
+    graphs: list[ProjectGraphRead]

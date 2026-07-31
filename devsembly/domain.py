@@ -99,6 +99,20 @@ class ProjectStateAssertionStatus(StrEnum):
     DISPUTED = "disputed"
 
 
+class ProjectWorkItemKind(StrEnum):
+    ROADMAP = "roadmap"
+    MILESTONE = "milestone"
+    EPIC = "epic"
+    FEATURE = "feature"
+    TASK = "task"
+    SPRINT = "sprint"
+
+
+class ProjectGraphKind(StrEnum):
+    CAPABILITY = "capability"
+    DEPENDENCY = "dependency"
+
+
 @dataclass(frozen=True, slots=True)
 class Organization:
     id: uuid.UUID
@@ -312,6 +326,99 @@ class ProjectStateRevision:
     confidence: Decimal
     confidence_explanation: str
     created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectProjectionCheckpoint:
+    project_id: uuid.UUID
+    source_revision_id: uuid.UUID
+    source_version: int
+    rebuilt_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectWorkItem:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    stable_id: str
+    kind: ProjectWorkItemKind
+    title: str
+    status: str
+    parent_stable_id: str | None
+    source_revision_id: uuid.UUID
+    source_provider: str
+    source_kind: str
+    source_external_id: str | None
+    source_uri: str | None
+    source_occurred_at: datetime | None
+    source_observed_at: datetime
+    assertion_status: ProjectStateAssertionStatus
+    confidence: Decimal
+    confidence_explanation: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectProviderAlias:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    canonical_id: str
+    provider: str
+    account: str
+    external_kind: str
+    external_id: str
+    uri: str | None
+    source_revision_id: uuid.UUID
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectGraphNode:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    stable_id: str
+    graph_kind: ProjectGraphKind
+    entity_kind: str
+    title: str
+    status: str
+    source_revision_id: uuid.UUID
+    source_provider: str
+    source_kind: str
+    source_external_id: str | None
+    source_uri: str | None
+    source_occurred_at: datetime | None
+    source_observed_at: datetime
+    assertion_status: ProjectStateAssertionStatus
+    confidence: Decimal
+    confidence_explanation: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectGraphEdge:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    stable_id: str
+    graph_kind: ProjectGraphKind
+    from_stable_id: str
+    to_stable_id: str
+    relationship: str
+    source_revision_id: uuid.UUID
+    source_provider: str
+    source_kind: str
+    source_external_id: str | None
+    source_uri: str | None
+    source_occurred_at: datetime | None
+    source_observed_at: datetime
+    assertion_status: ProjectStateAssertionStatus
+    confidence: Decimal
+    confidence_explanation: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectIntelligenceProjection:
+    checkpoint: ProjectProjectionCheckpoint
+    work_items: tuple[ProjectWorkItem, ...]
+    aliases: tuple[ProjectProviderAlias, ...]
+    graph_nodes: tuple[ProjectGraphNode, ...]
+    graph_edges: tuple[ProjectGraphEdge, ...]
 
 
 @dataclass(frozen=True, slots=True)

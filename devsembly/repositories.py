@@ -15,6 +15,7 @@ from devsembly.domain import (
     Organization,
     OutboxMessage,
     Project,
+    ProjectIntelligenceProjection,
     ProjectStateRevision,
     WorkflowRun,
     WorkflowStep,
@@ -88,6 +89,12 @@ class ProjectStateRevisionRepository(Protocol):
     ) -> ProjectStateRevision | None: ...
 
     async def list(self, project_id: uuid.UUID) -> Sequence[ProjectStateRevision]: ...
+
+
+class ProjectIntelligenceProjectionRepository(Protocol):
+    async def replace(self, projection: ProjectIntelligenceProjection) -> None: ...
+
+    async def get(self, project_id: uuid.UUID) -> ProjectIntelligenceProjection | None: ...
 
 
 class BudgetRepository(Protocol):

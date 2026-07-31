@@ -273,6 +273,194 @@ class ProjectStateRevision(Base):
     )
 
 
+class ProjectIntelligenceProjection(Base):
+    __tablename__ = "project_intelligence_projections"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    source_revision_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_state_revisions.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    source_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    rebuilt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ProjectIntelligenceWorkItem(Base):
+    __tablename__ = "project_intelligence_work_items"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('roadmap', 'milestone', 'epic', 'feature', 'task', 'sprint')",
+            name="ck_project_intelligence_work_items_kind",
+        ),
+        CheckConstraint(
+            "assertion_status IN ('verified', 'inferred', 'disputed')",
+            name="ck_project_intelligence_work_items_assertion",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_project_intelligence_work_items_confidence",
+        ),
+        UniqueConstraint("project_id", "stable_id", name="uq_pie_work_item_stable_id"),
+        Index("ix_pie_work_items_project_kind", "project_id", "kind"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    stable_id: Mapped[str] = mapped_column(String(240), nullable=False)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    status: Mapped[str] = mapped_column(String(80), nullable=False)
+    parent_stable_id: Mapped[str | None] = mapped_column(String(240))
+    source_revision_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_state_revisions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_provider: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_kind: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_external_id: Mapped[str | None] = mapped_column(String(500))
+    source_uri: Mapped[str | None] = mapped_column(String(1000))
+    source_occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    assertion_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
+    confidence_explanation: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class ProjectIntelligenceProviderAlias(Base):
+    __tablename__ = "project_intelligence_provider_aliases"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "provider",
+            "account",
+            "external_kind",
+            "external_id",
+            name="uq_pie_provider_alias_scope",
+        ),
+        Index("ix_pie_alias_canonical", "project_id", "canonical_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    canonical_id: Mapped[str] = mapped_column(String(240), nullable=False)
+    provider: Mapped[str] = mapped_column(String(80), nullable=False)
+    account: Mapped[str] = mapped_column(String(240), nullable=False)
+    external_kind: Mapped[str] = mapped_column(String(80), nullable=False)
+    external_id: Mapped[str] = mapped_column(String(500), nullable=False)
+    uri: Mapped[str | None] = mapped_column(String(1000))
+    source_revision_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_state_revisions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+
+class ProjectIntelligenceGraphNode(Base):
+    __tablename__ = "project_intelligence_graph_nodes"
+    __table_args__ = (
+        CheckConstraint(
+            "graph_kind IN ('capability', 'dependency')",
+            name="ck_project_intelligence_graph_nodes_kind",
+        ),
+        CheckConstraint(
+            "assertion_status IN ('verified', 'inferred', 'disputed')",
+            name="ck_project_intelligence_graph_nodes_assertion",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_project_intelligence_graph_nodes_confidence",
+        ),
+        UniqueConstraint(
+            "project_id", "graph_kind", "stable_id", name="uq_pie_graph_node_stable_id"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    stable_id: Mapped[str] = mapped_column(String(240), nullable=False)
+    graph_kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    entity_kind: Mapped[str] = mapped_column(String(80), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    status: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_revision_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_state_revisions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_provider: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_kind: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_external_id: Mapped[str | None] = mapped_column(String(500))
+    source_uri: Mapped[str | None] = mapped_column(String(1000))
+    source_occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    assertion_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
+    confidence_explanation: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class ProjectIntelligenceGraphEdge(Base):
+    __tablename__ = "project_intelligence_graph_edges"
+    __table_args__ = (
+        CheckConstraint(
+            "graph_kind IN ('capability', 'dependency')",
+            name="ck_project_intelligence_graph_edges_kind",
+        ),
+        CheckConstraint(
+            "relationship IN ('parent_of', 'depends_on', 'implements', 'validates', "
+            "'evidences', 'blocks', 'supersedes', 'derived_from')",
+            name="ck_project_intelligence_graph_edges_relationship",
+        ),
+        CheckConstraint(
+            "assertion_status IN ('verified', 'inferred', 'disputed')",
+            name="ck_project_intelligence_graph_edges_assertion",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_project_intelligence_graph_edges_confidence",
+        ),
+        UniqueConstraint(
+            "project_id", "graph_kind", "stable_id", name="uq_pie_graph_edge_stable_id"
+        ),
+        Index("ix_pie_graph_edge_from", "project_id", "graph_kind", "from_stable_id"),
+        Index("ix_pie_graph_edge_to", "project_id", "graph_kind", "to_stable_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    stable_id: Mapped[str] = mapped_column(String(240), nullable=False)
+    graph_kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    from_stable_id: Mapped[str] = mapped_column(String(240), nullable=False)
+    to_stable_id: Mapped[str] = mapped_column(String(240), nullable=False)
+    relationship: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_revision_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_state_revisions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_provider: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_kind: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_external_id: Mapped[str | None] = mapped_column(String(500))
+    source_uri: Mapped[str | None] = mapped_column(String(1000))
+    source_occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    assertion_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
+    confidence_explanation: Mapped[str] = mapped_column(Text, nullable=False)
+
+
 class CostEvaluation(Base):
     __tablename__ = "cost_evaluations"
     __table_args__ = (

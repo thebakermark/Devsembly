@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import cast
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,9 +31,17 @@ from devsembly.domain import (
     Organization,
     OutboxMessage,
     Project,
+    ProjectGraphEdge,
+    ProjectGraphKind,
+    ProjectGraphNode,
+    ProjectIntelligenceProjection,
+    ProjectProjectionCheckpoint,
+    ProjectProviderAlias,
     ProjectStateAssertionStatus,
     ProjectStateRevision,
     ProjectStatus,
+    ProjectWorkItem,
+    ProjectWorkItemKind,
     WorkflowAttemptStatus,
     WorkflowRun,
     WorkflowRunStatus,
@@ -101,6 +109,72 @@ def _project_state_revision(model: models.ProjectStateRevision) -> ProjectStateR
         confidence=model.confidence,
         confidence_explanation=model.confidence_explanation,
         created_at=model.created_at,
+    )
+
+
+def _project_work_item(model: models.ProjectIntelligenceWorkItem) -> ProjectWorkItem:
+    return ProjectWorkItem(
+        id=model.id,
+        project_id=model.project_id,
+        stable_id=model.stable_id,
+        kind=ProjectWorkItemKind(model.kind),
+        title=model.title,
+        status=model.status,
+        parent_stable_id=model.parent_stable_id,
+        source_revision_id=model.source_revision_id,
+        source_provider=model.source_provider,
+        source_kind=model.source_kind,
+        source_external_id=model.source_external_id,
+        source_uri=model.source_uri,
+        source_occurred_at=model.source_occurred_at,
+        source_observed_at=model.source_observed_at,
+        assertion_status=ProjectStateAssertionStatus(model.assertion_status),
+        confidence=model.confidence,
+        confidence_explanation=model.confidence_explanation,
+    )
+
+
+def _project_graph_node(model: models.ProjectIntelligenceGraphNode) -> ProjectGraphNode:
+    return ProjectGraphNode(
+        id=model.id,
+        project_id=model.project_id,
+        stable_id=model.stable_id,
+        graph_kind=ProjectGraphKind(model.graph_kind),
+        entity_kind=model.entity_kind,
+        title=model.title,
+        status=model.status,
+        source_revision_id=model.source_revision_id,
+        source_provider=model.source_provider,
+        source_kind=model.source_kind,
+        source_external_id=model.source_external_id,
+        source_uri=model.source_uri,
+        source_occurred_at=model.source_occurred_at,
+        source_observed_at=model.source_observed_at,
+        assertion_status=ProjectStateAssertionStatus(model.assertion_status),
+        confidence=model.confidence,
+        confidence_explanation=model.confidence_explanation,
+    )
+
+
+def _project_graph_edge(model: models.ProjectIntelligenceGraphEdge) -> ProjectGraphEdge:
+    return ProjectGraphEdge(
+        id=model.id,
+        project_id=model.project_id,
+        stable_id=model.stable_id,
+        graph_kind=ProjectGraphKind(model.graph_kind),
+        from_stable_id=model.from_stable_id,
+        to_stable_id=model.to_stable_id,
+        relationship=model.relationship,
+        source_revision_id=model.source_revision_id,
+        source_provider=model.source_provider,
+        source_kind=model.source_kind,
+        source_external_id=model.source_external_id,
+        source_uri=model.source_uri,
+        source_occurred_at=model.source_occurred_at,
+        source_observed_at=model.source_observed_at,
+        assertion_status=ProjectStateAssertionStatus(model.assertion_status),
+        confidence=model.confidence,
+        confidence_explanation=model.confidence_explanation,
     )
 
 
@@ -565,6 +639,187 @@ class SqlAlchemyProjectStateRevisionRepository:
             .order_by(models.ProjectStateRevision.version)
         )
         return [_project_state_revision(model) for model in result]
+
+
+class SqlAlchemyProjectIntelligenceProjectionRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def replace(self, projection: ProjectIntelligenceProjection) -> None:
+        project_id = projection.checkpoint.project_id
+        for model in (
+            models.ProjectIntelligenceProviderAlias,
+            models.ProjectIntelligenceGraphEdge,
+            models.ProjectIntelligenceGraphNode,
+            models.ProjectIntelligenceWorkItem,
+            models.ProjectIntelligenceProjection,
+        ):
+            await self._session.execute(delete(model).where(model.project_id == project_id))
+        await self._session.flush()
+        self._session.add(
+            models.ProjectIntelligenceProjection(
+                project_id=project_id,
+                source_revision_id=projection.checkpoint.source_revision_id,
+                source_version=projection.checkpoint.source_version,
+                rebuilt_at=projection.checkpoint.rebuilt_at,
+            )
+        )
+        self._session.add_all(
+            [
+                models.ProjectIntelligenceWorkItem(
+                    id=item.id,
+                    project_id=item.project_id,
+                    stable_id=item.stable_id,
+                    kind=item.kind.value,
+                    title=item.title,
+                    status=item.status,
+                    parent_stable_id=item.parent_stable_id,
+                    source_revision_id=item.source_revision_id,
+                    source_provider=item.source_provider,
+                    source_kind=item.source_kind,
+                    source_external_id=item.source_external_id,
+                    source_uri=item.source_uri,
+                    source_occurred_at=item.source_occurred_at,
+                    source_observed_at=item.source_observed_at,
+                    assertion_status=item.assertion_status.value,
+                    confidence=item.confidence,
+                    confidence_explanation=item.confidence_explanation,
+                )
+                for item in projection.work_items
+            ]
+        )
+        self._session.add_all(
+            [
+                models.ProjectIntelligenceProviderAlias(
+                    id=item.id,
+                    project_id=item.project_id,
+                    canonical_id=item.canonical_id,
+                    provider=item.provider,
+                    account=item.account,
+                    external_kind=item.external_kind,
+                    external_id=item.external_id,
+                    uri=item.uri,
+                    source_revision_id=item.source_revision_id,
+                )
+                for item in projection.aliases
+            ]
+        )
+        self._session.add_all(
+            [
+                models.ProjectIntelligenceGraphNode(
+                    id=item.id,
+                    project_id=item.project_id,
+                    stable_id=item.stable_id,
+                    graph_kind=item.graph_kind.value,
+                    entity_kind=item.entity_kind,
+                    title=item.title,
+                    status=item.status,
+                    source_revision_id=item.source_revision_id,
+                    source_provider=item.source_provider,
+                    source_kind=item.source_kind,
+                    source_external_id=item.source_external_id,
+                    source_uri=item.source_uri,
+                    source_occurred_at=item.source_occurred_at,
+                    source_observed_at=item.source_observed_at,
+                    assertion_status=item.assertion_status.value,
+                    confidence=item.confidence,
+                    confidence_explanation=item.confidence_explanation,
+                )
+                for item in projection.graph_nodes
+            ]
+        )
+        self._session.add_all(
+            [
+                models.ProjectIntelligenceGraphEdge(
+                    id=item.id,
+                    project_id=item.project_id,
+                    stable_id=item.stable_id,
+                    graph_kind=item.graph_kind.value,
+                    from_stable_id=item.from_stable_id,
+                    to_stable_id=item.to_stable_id,
+                    relationship=item.relationship,
+                    source_revision_id=item.source_revision_id,
+                    source_provider=item.source_provider,
+                    source_kind=item.source_kind,
+                    source_external_id=item.source_external_id,
+                    source_uri=item.source_uri,
+                    source_occurred_at=item.source_occurred_at,
+                    source_observed_at=item.source_observed_at,
+                    assertion_status=item.assertion_status.value,
+                    confidence=item.confidence,
+                    confidence_explanation=item.confidence_explanation,
+                )
+                for item in projection.graph_edges
+            ]
+        )
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            raise DuplicateResourceError("project intelligence projection") from exc
+
+    async def get(self, project_id: uuid.UUID) -> ProjectIntelligenceProjection | None:
+        checkpoint = await self._session.get(models.ProjectIntelligenceProjection, project_id)
+        if checkpoint is None:
+            return None
+        work_items = await self._session.scalars(
+            select(models.ProjectIntelligenceWorkItem)
+            .where(models.ProjectIntelligenceWorkItem.project_id == project_id)
+            .order_by(
+                models.ProjectIntelligenceWorkItem.kind,
+                models.ProjectIntelligenceWorkItem.stable_id,
+            )
+        )
+        aliases = await self._session.scalars(
+            select(models.ProjectIntelligenceProviderAlias)
+            .where(models.ProjectIntelligenceProviderAlias.project_id == project_id)
+            .order_by(
+                models.ProjectIntelligenceProviderAlias.provider,
+                models.ProjectIntelligenceProviderAlias.account,
+                models.ProjectIntelligenceProviderAlias.external_kind,
+                models.ProjectIntelligenceProviderAlias.external_id,
+            )
+        )
+        nodes = await self._session.scalars(
+            select(models.ProjectIntelligenceGraphNode)
+            .where(models.ProjectIntelligenceGraphNode.project_id == project_id)
+            .order_by(
+                models.ProjectIntelligenceGraphNode.graph_kind,
+                models.ProjectIntelligenceGraphNode.stable_id,
+            )
+        )
+        edges = await self._session.scalars(
+            select(models.ProjectIntelligenceGraphEdge)
+            .where(models.ProjectIntelligenceGraphEdge.project_id == project_id)
+            .order_by(
+                models.ProjectIntelligenceGraphEdge.graph_kind,
+                models.ProjectIntelligenceGraphEdge.stable_id,
+            )
+        )
+        return ProjectIntelligenceProjection(
+            checkpoint=ProjectProjectionCheckpoint(
+                project_id=checkpoint.project_id,
+                source_revision_id=checkpoint.source_revision_id,
+                source_version=checkpoint.source_version,
+                rebuilt_at=checkpoint.rebuilt_at,
+            ),
+            work_items=tuple(_project_work_item(item) for item in work_items),
+            aliases=tuple(
+                ProjectProviderAlias(
+                    id=item.id,
+                    project_id=item.project_id,
+                    canonical_id=item.canonical_id,
+                    provider=item.provider,
+                    account=item.account,
+                    external_kind=item.external_kind,
+                    external_id=item.external_id,
+                    uri=item.uri,
+                    source_revision_id=item.source_revision_id,
+                )
+                for item in aliases
+            ),
+            graph_nodes=tuple(_project_graph_node(item) for item in nodes),
+            graph_edges=tuple(_project_graph_edge(item) for item in edges),
+        )
 
 
 class SqlAlchemyBudgetRepository:

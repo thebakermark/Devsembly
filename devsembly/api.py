@@ -18,6 +18,7 @@ from devsembly.errors import (
     EvidenceIntegrityError,
     IdempotencyConflictError,
     InvalidTransitionError,
+    ProjectStateValidationError,
     ResourceNotFoundError,
     StaleVersionError,
 )
@@ -126,7 +127,7 @@ async def invalid_transition(request: Request, exc: InvalidTransitionError) -> J
 async def cost_governance_error(request: Request, exc: CostGovernanceError) -> JSONResponse:
     del request
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={
             "code": "cost_governance_error",
             "detail": str(exc),
@@ -144,6 +145,17 @@ async def evidence_integrity_error(request: Request, exc: EvidenceIntegrityError
             "detail": str(exc),
             "evidence_id": exc.evidence_id,
         },
+    )
+
+
+@app.exception_handler(ProjectStateValidationError)
+async def project_state_validation_error(
+    request: Request, exc: ProjectStateValidationError
+) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        content={"code": "project_state_validation_error", "detail": exc.detail},
     )
 
 

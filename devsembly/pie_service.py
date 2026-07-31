@@ -10,10 +10,12 @@ from decimal import Decimal
 from devsembly.audit import current_audit_actor
 from devsembly.domain import (
     OutboxMessage,
+    ProjectIntelligenceProjection,
     ProjectStateAssertionStatus,
     ProjectStateRevision,
 )
 from devsembly.errors import IdempotencyConflictError, ResourceNotFoundError, StaleVersionError
+from devsembly.pie_projection import build_projection
 from devsembly.unit_of_work import UnitOfWork
 
 UnitOfWorkFactory = Callable[[], UnitOfWork]
@@ -69,6 +71,62 @@ class ProjectIntelligenceService:
         async with self._unit_of_work() as unit:
             await self._require_project(unit, organization_id, initiative_id, project_id)
             return await unit.project_state_revisions.list(project_id)
+
+    async def projection(
+        self,
+        organization_id: uuid.UUID,
+        initiative_id: uuid.UUID,
+        project_id: uuid.UUID,
+    ) -> ProjectIntelligenceProjection:
+        async with self._unit_of_work() as unit:
+            await self._require_project(unit, organization_id, initiative_id, project_id)
+            projection = await unit.project_intelligence_projection.get(project_id)
+            if projection is None:
+                raise ResourceNotFoundError("project intelligence projection")
+            return projection
+
+    async def rebuild_projection(
+        self,
+        organization_id: uuid.UUID,
+        initiative_id: uuid.UUID,
+        project_id: uuid.UUID,
+        version: int,
+    ) -> ProjectIntelligenceProjection:
+        now = self._clock()
+        async with self._unit_of_work() as unit:
+            await self._require_project(unit, organization_id, initiative_id, project_id)
+            revision = await unit.project_state_revisions.get_version(project_id, version)
+            if revision is None:
+                raise ResourceNotFoundError("project state revision")
+            latest = await unit.project_state_revisions.latest(project_id)
+            if latest is None or latest.version != version:
+                raise StaleVersionError("project intelligence projection", version)
+            projection = build_projection(revision, now)
+            await unit.project_intelligence_projection.replace(projection)
+            actor_type, actor_id = current_audit_actor()
+            await unit.outbox.add(
+                OutboxMessage(
+                    id=uuid.uuid4(),
+                    occurred_at=now,
+                    topic="genesis.project-intelligence.projection-rebuilt",
+                    aggregate_id=str(project_id),
+                    payload={
+                        "organization_id": str(organization_id),
+                        "initiative_id": str(initiative_id),
+                        "project_id": str(project_id),
+                        "source_revision_id": str(revision.id),
+                        "source_version": revision.version,
+                        "work_item_count": len(projection.work_items),
+                        "alias_count": len(projection.aliases),
+                        "graph_node_count": len(projection.graph_nodes),
+                        "graph_edge_count": len(projection.graph_edges),
+                    },
+                    actor_type=actor_type,
+                    actor_id=actor_id,
+                )
+            )
+            await unit.commit()
+            return projection
 
     async def reconcile(
         self,
@@ -146,7 +204,9 @@ class ProjectIntelligenceService:
                 confidence_explanation=confidence_explanation,
                 created_at=now,
             )
+            projection = build_projection(revision, now)
             await unit.project_state_revisions.add(revision)
+            await unit.project_intelligence_projection.replace(projection)
             actor_type, actor_id = current_audit_actor()
             await unit.outbox.add(
                 OutboxMessage(
@@ -166,6 +226,12 @@ class ProjectIntelligenceService:
                         "source_kind": source_kind,
                         "assertion_status": assertion_status.value,
                         "confidence": str(confidence),
+                        "projection": {
+                            "work_items": len(projection.work_items),
+                            "aliases": len(projection.aliases),
+                            "graph_nodes": len(projection.graph_nodes),
+                            "graph_edges": len(projection.graph_edges),
+                        },
                     },
                     actor_type=actor_type,
                     actor_id=actor_id,
