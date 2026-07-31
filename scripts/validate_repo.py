@@ -16,7 +16,7 @@ REQUIRED = [
     Path(".devsembly/project-state.json"),
     Path(".devsembly/product-definition.json"),
     Path("docs/genesis/schemas/product-definition.schema.json"),
-    Path("docs/product/product-definition.generated.md"),
+    Path("docs/product/product-specification.md"),
 ]
 
 missing = [str(path) for path in REQUIRED if not path.is_file()]

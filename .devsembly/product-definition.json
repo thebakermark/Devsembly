@@ -1,4 +1,6 @@
 {
+  "schema_version": "1.0",
+  "status": "accepted",
   "stable_id": "platform:software-delivery",
   "display_name": "Devsembly",
   "category": "Governed AI-native software delivery platform",
@@ -7,6 +9,7 @@
   "plain_language_description": "A user describes what they want to build, the constraints they must work within, and the outcome they need. Devsembly turns that intent into organized work, coordinates specialized AI agents and development tools, validates the results, and keeps the project's knowledge current across sessions and systems.",
   "technical_description": "Devsembly is a provider-neutral enterprise AI development platform combining canonical project intelligence, multi-agent orchestration, durable workflows, governed tools and capabilities, memory and context management, provider synchronization, identity and policy enforcement, evidence-backed validation, cost governance, observability, recommendations, and forecasting.",
   "mission": "Make enterprise-grade software creation accessible, repeatable, auditable, and economically sustainable by combining AI labor with disciplined engineering and governance.",
+  "vision": "Enable a person, team, or enterprise to move from business intent to production software through a durable, governed, and increasingly autonomous delivery system.",
   "target_audiences": [
     "Founders and business leaders who need software without managing a conventional engineering organization.",
     "Product and technology executives who need reliable visibility across AI-assisted delivery.",
@@ -56,6 +59,73 @@
       "title": "Stable identifiers, changeable names",
       "statement": "Separate persisted technical identifiers from configurable product, runtime, capability, and platform display names."
     }
+  ],
+  "problems": [
+    "AI tools lose project context and repeat or contradict prior work.",
+    "Repositories, tickets, documents, chats, and dashboards become competing sources of truth.",
+    "Coding agents can act without shared priorities, authority, evidence, or cost boundaries.",
+    "Long-running development work is difficult to recover, validate, and audit.",
+    "Business users must manually translate intent into technical work and repeatedly coordinate tools."
+  ],
+  "core_capabilities": [
+    {"id": "capability:project-intelligence", "title": "Project intelligence", "outcome": "Maintain schema-versioned project truth, provenance, work hierarchy, graphs, validation, risk, debt, recommendations, and forecasts."},
+    {"id": "capability:agent-orchestration", "title": "Governed AI workforce", "outcome": "Coordinate specialized agents with explicit roles, permissions, context, budgets, and escalation rules."},
+    {"id": "capability:durable-workflows", "title": "Durable workflow orchestration", "outcome": "Persist intent before execution and recover long-running work without duplicate side effects."},
+    {"id": "capability:memory-context", "title": "Memory and context", "outcome": "Assemble authorized, relevant, provenance-aware working context from durable project knowledge."},
+    {"id": "capability:provider-integration", "title": "Provider integration", "outcome": "Use replaceable source-control, model, cloud, workflow, and tool providers through stable contracts."},
+    {"id": "capability:governance", "title": "Identity and governance", "outcome": "Enforce identity, authorization, policy, approval, budget, audit, and human-authority boundaries."},
+    {"id": "capability:validation-evidence", "title": "Validation and evidence", "outcome": "Connect claims and completion status to tests, reviews, artifacts, provenance, and immutable evidence."},
+    {"id": "capability:operations", "title": "Operations and observability", "outcome": "Expose health, execution, cost, risk, failures, and recovery controls to operators."}
+  ],
+  "primary_workflow": [
+    "Capture business intent, constraints, and success measures.",
+    "Create canonical requirements and a traceable work item.",
+    "Build authorized task context and evaluate policy, risk, and budget.",
+    "Create an isolated branch and workspace.",
+    "Execute bounded agent implementation.",
+    "Run deterministic validation and bounded repair.",
+    "Publish a draft pull request with evidence for human review.",
+    "Propose the run outcome to governed project memory.",
+    "Reconcile provider state and recommend the next work."
+  ],
+  "non_goals": [
+    "Unsupervised production changes without policy-required human approval.",
+    "Replacing source control, CI, workflow engines, or model providers.",
+    "Treating generated text or a vector index as authoritative project truth.",
+    "Requiring one model vendor, cloud, repository host, or issue tracker.",
+    "Building every CompanyOS business module before the delivery platform works end to end."
+  ],
+  "success_measures": [
+    "Time from accepted business intent to a validated draft change request.",
+    "Percentage of completed work linked to requirements, evidence, decisions, and project memory.",
+    "Workflow recovery rate without duplicate work items, branches, or pull requests.",
+    "Human interventions and repeated context explanations per accepted increment.",
+    "Validation pass rate, escaped-defect rate, and cost per accepted capability."
+  ],
+  "current_maturity": {
+    "stage": "Genesis reference implementation",
+    "implemented": "Core persistence, APIs, durable workflow dispatch, identity, policy, cost governance, evidence, audit, outbox publication, GitHub reconciliation, PIE projections, and governed context assembly.",
+    "not_yet_proven": "A live development-host demonstration of the complete business-intent to traceable issue, isolated implementation, validated draft pull request, and updated project-memory loop."
+  },
+  "near_term_milestone": {
+    "id": "milestone:first-governed-delivery-loop",
+    "title": "First governed autonomous delivery loop",
+    "exit_criteria": [
+      "An authorized request starts a durable workflow through the control-plane API.",
+      "The run creates or links a traceable work item before implementation.",
+      "Agent changes remain inside an isolated workspace and declared path boundary.",
+      "Validation evidence is captured and bounded repair is enforced.",
+      "A draft, unmerged pull request is published for human review.",
+      "The outcome is proposed to governed project memory with provider links and evidence."
+    ]
+  },
+  "authority_model": [
+    {"information": "Code, commits, pull requests, reviews, and CI evidence", "authority": "Source-control provider"},
+    {"information": "Effective project operating state", "authority": "PIE canonical revision store"},
+    {"information": "Portable repository state package", "authority": "Generated .devsembly modules"},
+    {"information": "Durable workflow recovery state", "authority": "Workflow engine history"},
+    {"information": "Large immutable validation artifacts", "authority": "Evidence storage"},
+    {"information": "Agent working context", "authority": "Rebuildable non-authoritative context package"}
   ],
   "names": {
     "software_delivery_platform": {

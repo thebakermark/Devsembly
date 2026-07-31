@@ -32,11 +32,11 @@ docker compose exec worker claude --version
 docker compose exec worker bash -n /app/scripts/providers/claude-code.sh
 ```
 
-The coding provider receives only an explicit environment allowlist. In particular, `DEVSEMBLY_SOURCE_CONTROL_TOKEN`, database credentials, and unrelated host secrets are not inherited by Claude Code.
+The coding provider receives only an explicit environment allowlist. In particular, `DEVSEMBLY_SOURCE_CONTROL_TOKEN`, database credentials, and unrelated host secrets are not inherited by Claude Code. The control plane uses the source-control token separately to create the traceable issue and publish the draft pull request.
 
 ## First live run
 
-Use a disposable fixture repository before targeting Devsembly. Submit a bounded task with explicit allowed paths and validation commands. The expected outcome is a factory branch and draft change request; the system does not merge or deploy the result.
+Use a disposable fixture repository before targeting Devsembly. Submit a bounded task with explicit allowed paths and validation commands. The expected outcome is a traceable issue, factory branch, draft change request, validation evidence, and—when canonical project IDs are supplied—a governed MemoryOS proposal. The system does not merge or deploy the result.
 
 Recommended first task:
 

@@ -1,6 +1,6 @@
 # Control-plane MVP
 
-This is the first executable Devsembly vertical slice. It accepts a structured product request, starts a durable Temporal workflow, creates a task packet, executes a safe mock builder, runs validation independently, performs an independent evidence review, and returns a terminal result.
+This is the first executable Devsembly delivery loop. It accepts a structured product request, starts a durable Temporal workflow, creates a traceable issue and isolated branch, invokes the configured coding provider, runs deterministic validation and bounded repair, publishes a draft pull request, performs an independent evidence review, and proposes the completed episode to governed project memory.
 
 ## Start
 
@@ -17,22 +17,42 @@ Services:
 ## Submit a run
 
 ```bash
-curl -X POST http://localhost:8000/runs \
+curl -X POST \
+  http://localhost:8000/api/v1/organizations/<organization-id>/initiatives/<initiative-id>/projects/<project-id>/workflow-runs \
   -H 'content-type: application/json' \
   -d '{
-    "title": "Build fixture API",
-    "objective": "Create and test a small API endpoint in the fixture repository.",
-    "repository_url": "https://github.com/thebakermark/Devsembly",
-    "validation_commands": ["python -c \"print(123)\""]
+    "workflow_kind": "software_delivery",
+    "idempotency_key": "fixture-hello-v1",
+    "input_payload": {
+      "title": "Build fixture API",
+      "objective": "Create and test a small API endpoint in the fixture repository.",
+      "repository_url": "https://github.com/thebakermark/devsembly-factory-fixture",
+      "base_branch": "main",
+      "allowed_paths": ["src/", "tests/", "README.md"],
+      "validation_commands": ["pytest -q"],
+      "max_repair_attempts": 2
+    },
+    "steps": [
+      {"key": "intake", "name": "Create traceable work item"},
+      {"key": "implement", "name": "Implement in isolated workspace"},
+      {"key": "validate", "name": "Validate and repair"},
+      {"key": "publish", "name": "Publish draft pull request"},
+      {"key": "remember", "name": "Propose outcome to project memory"}
+    ]
   }'
 ```
 
-Copy the returned `workflow_id`, then retrieve the result:
+Copy `run.id` from the response, then retrieve the persisted run and step evidence:
 
 ```bash
-curl http://localhost:8000/runs/<workflow_id>
+curl \
+  http://localhost:8000/api/v1/organizations/<organization-id>/initiatives/<initiative-id>/projects/<project-id>/workflow-runs/<run-id>
 ```
 
-## Current boundary
+## Completion boundary
 
-The worker intentionally uses a mock builder. The next implementation replaces it with provider adapters for OpenHands, Codex, and Claude Code, then adds repository checkout, disposable Docker workspaces, GitHub branch/PR creation, audit persistence, and bounded repair loops.
+The run is complete only when its traceable issue exists before implementation, changes remain within the declared paths, every configured validation command passes, a draft pull request exists, independent review accepts the evidence, and a MemoryOS episodic proposal records the outcome. The canonical organization, initiative, and project IDs come from the governed API path rather than caller-controlled workflow input. The proposal remains governed and does not silently become approved semantic truth.
+
+The source-control provider is idempotent at the work-item boundary by embedding the stable run identifier in the issue. Pull requests remain draft and are never merged by this workflow.
+
+Use a disposable fixture repository for the first development-host demonstration. Production deployment and merge remain outside this milestone.

@@ -19,14 +19,14 @@ ROOT = Path(__file__).resolve().parents[1]
 STATE_ROOT = ROOT / ".devsembly"
 MANIFEST_PATH = STATE_ROOT / "manifest.json"
 SCHEMA_PATH = ROOT / "docs" / "genesis" / "schemas" / "product-definition.schema.json"
-OUTPUT_PATH = ROOT / "docs" / "product" / "product-definition.generated.md"
+OUTPUT_PATH = ROOT / "docs" / "product" / "product-specification.md"
 
 
 def load_json(path: Path) -> dict[str, Any]:
     with path.open(encoding="utf-8") as handle:
         value = json.load(handle)
     if not isinstance(value, dict):
-        raise ValueError(f"{path} must contain a JSON object")
+        raise TypeError(f"{path} must contain a JSON object")
     return value
 
 
@@ -48,36 +48,62 @@ def resolve_module(manifest: dict[str, Any], module_name: str) -> Path:
 def render(definition: dict[str, Any]) -> str:
     names = definition["names"]
     audience = "\n".join(f"- {item}" for item in definition["target_audiences"])
+    problems = "\n".join(
+        f"{index}. {item}" for index, item in enumerate(definition["problems"], start=1)
+    )
     principles = "\n\n".join(
-        f"### {item['title']}\n\n{item['statement']}"
-        for item in definition["design_principles"]
+        f"### {item['title']}\n\n{item['statement']}" for item in definition["design_principles"]
+    )
+    capabilities = "\n".join(
+        f"| `{item['id']}` | {item['title']} | {item['outcome']} |"
+        for item in definition["core_capabilities"]
+    )
+    workflow_steps = "\n".join(
+        f"{index}. {item}" for index, item in enumerate(definition["primary_workflow"], start=1)
+    )
+    non_goals = "\n".join(f"- {item}" for item in definition["non_goals"])
+    success_measures = "\n".join(f"- {item}" for item in definition["success_measures"])
+    milestone = definition["near_term_milestone"]
+    exit_criteria = "\n".join(f"- {item}" for item in milestone["exit_criteria"])
+    authority_rows = "\n".join(
+        f"| {item['information']} | {item['authority']} |" for item in definition["authority_model"]
     )
     naming_rows = "\n".join(
         f"| `{binding['stable_id']}` | {binding['display_name']} | {binding['technical_term']} |"
         for binding in names.values()
     )
     return f"""<!-- GENERATED FILE: edit .devsembly/product-definition.json, not this file. -->
-# {definition['display_name']} Product Definition
+# {definition["display_name"]} Product Specification
 
-**Stable ID:** `{definition['stable_id']}`  
-**Category:** {definition['category']}  
-**Tagline:** {definition['tagline']}
+**Stable ID:** `{definition["stable_id"]}`
+
+**Specification:** {definition["schema_version"]}
+
+**Status:** {definition["status"]}
+
+**Category:** {definition["category"]}
+
+**Tagline:** {definition["tagline"]}
 
 ## General description
 
-{definition['general_description']}
+{definition["general_description"]}
 
 ## Plain-language description
 
-{definition['plain_language_description']}
+{definition["plain_language_description"]}
 
 ## Technical description
 
-{definition['technical_description']}
+{definition["technical_description"]}
 
 ## Mission
 
-{definition['mission']}
+{definition["mission"]}
+
+## Vision
+
+{definition["vision"]}
 
 ## Target audiences
 
@@ -87,11 +113,59 @@ def render(definition: dict[str, Any]) -> str:
 
 {principles}
 
+## Problems solved
+
+{problems}
+
+## Core capabilities
+
+| Stable capability | Product capability | Intended outcome |
+| --- | --- | --- |
+{capabilities}
+
+## Foundational delivery workflow
+
+{workflow_steps}
+
+## Product boundaries
+
+{non_goals}
+
+## Success measures
+
+{success_measures}
+
+## Current maturity
+
+**Stage:** {definition["current_maturity"]["stage"]}
+
+**Implemented foundation:** {definition["current_maturity"]["implemented"]}
+
+**Not yet proven:** {definition["current_maturity"]["not_yet_proven"]}
+
+## Next milestone
+
+**{milestone["title"]}** (`{milestone["id"]}`)
+
+{exit_criteria}
+
+## Source authority
+
+| Information | Authority |
+| --- | --- |
+{authority_rows}
+
 ## Naming configuration
 
 | Stable identifier | Display name | Industry-standard term |
 | --- | --- | --- |
 {naming_rows}
+
+## Governing rule
+
+This specification is generated from `.devsembly/product-definition.json`, a module
+of the canonical `.devsembly` state package. Edit the canonical module and regenerate
+this view; do not maintain a competing product specification by hand.
 """
 
 
@@ -113,8 +187,7 @@ def main() -> int:
     )
     if errors:
         formatted = "\n".join(
-            f"- {'/'.join(map(str, error.path)) or '<root>'}: {error.message}"
-            for error in errors
+            f"- {'/'.join(map(str, error.path)) or '<root>'}: {error.message}" for error in errors
         )
         raise SystemExit(f"product definition is invalid:\n{formatted}")
 

@@ -5,6 +5,8 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "schema_version",
+    "status",
     "stable_id",
     "display_name",
     "category",
@@ -13,11 +15,22 @@
     "plain_language_description",
     "technical_description",
     "mission",
+    "vision",
     "target_audiences",
     "design_principles",
+    "problems",
+    "core_capabilities",
+    "primary_workflow",
+    "non_goals",
+    "success_measures",
+    "current_maturity",
+    "near_term_milestone",
+    "authority_model",
     "names"
   ],
   "properties": {
+    "schema_version": { "const": "1.0" },
+    "status": { "enum": ["draft", "accepted", "deprecated"] },
     "stable_id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*:[A-Za-z0-9._/-]+$"
@@ -29,6 +42,7 @@
     "plain_language_description": { "type": "string", "minLength": 1 },
     "technical_description": { "type": "string", "minLength": 1 },
     "mission": { "type": "string", "minLength": 1 },
+    "vision": { "type": "string", "minLength": 1 },
     "target_audiences": {
       "type": "array",
       "minItems": 1,
@@ -52,6 +66,57 @@
         }
       }
     },
+    "problems": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+    "core_capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "outcome"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^capability:[A-Za-z0-9._/-]+$" },
+          "title": { "type": "string", "minLength": 1 },
+          "outcome": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "primary_workflow": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+    "non_goals": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+    "success_measures": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+    "current_maturity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "implemented", "not_yet_proven"],
+      "properties": {
+        "stage": { "type": "string", "minLength": 1 },
+        "implemented": { "type": "string", "minLength": 1 },
+        "not_yet_proven": { "type": "string", "minLength": 1 }
+      }
+    },
+    "near_term_milestone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "exit_criteria"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^milestone:[A-Za-z0-9._/-]+$" },
+        "title": { "type": "string", "minLength": 1 },
+        "exit_criteria": { "$ref": "#/$defs/nonEmptyUniqueStrings" }
+      }
+    },
+    "authority_model": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["information", "authority"],
+        "properties": {
+          "information": { "type": "string", "minLength": 1 },
+          "authority": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "names": {
       "type": "object",
       "additionalProperties": false,
@@ -65,6 +130,12 @@
     }
   },
   "$defs": {
+    "nonEmptyUniqueStrings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
     "nameBinding": {
       "type": "object",
       "additionalProperties": false,

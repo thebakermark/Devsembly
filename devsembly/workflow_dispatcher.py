@@ -20,6 +20,7 @@ from temporalio.exceptions import WorkflowAlreadyStartedError
 
 from devsembly import models
 from devsembly.database import SessionFactory
+from devsembly.factory import GovernedFactoryWorkflow
 from devsembly.temporal_workflows import CommittedWorkflow
 
 Clock = Callable[[], datetime]
@@ -53,8 +54,13 @@ class TemporalWorkflowStarter:
         self._task_queue = task_queue
 
     async def start(self, request: dict[str, object], workflow_id: str) -> None:
+        workflow_entrypoint = (
+            GovernedFactoryWorkflow.run
+            if request.get("workflow_kind") == "software_delivery"
+            else CommittedWorkflow.run
+        )
         await self._client.start_workflow(
-            CommittedWorkflow.run,
+            workflow_entrypoint,
             request,
             id=workflow_id,
             task_queue=self._task_queue,
@@ -189,15 +195,16 @@ class WorkflowDispatcher:
             ):
                 return None
 
+            source = await session.get(models.PublishedEvent, dispatch.source_event_id)
+            if source is None:
+                raise RuntimeError("dispatch source event is missing")
+
             if workflow_run.status == "accepted":
                 previous_version = workflow_run.version
                 workflow_run.status = "queued"
                 workflow_run.temporal_workflow_id = dispatch.temporal_workflow_id
                 workflow_run.version += 1
                 workflow_run.updated_at = now
-                source = await session.get(models.PublishedEvent, dispatch.source_event_id)
-                if source is None:
-                    raise RuntimeError("dispatch source event is missing")
                 payload = {
                     **source.payload,
                     "previous_status": "accepted",
@@ -254,6 +261,9 @@ class WorkflowDispatcher:
                 )
             )
             return {
+                "organization_id": source.payload["organization_id"],
+                "initiative_id": source.payload["initiative_id"],
+                "project_id": source.payload["project_id"],
                 "workflow_run_id": str(workflow_run.id),
                 "workflow_kind": workflow_run.workflow_kind,
                 "input_payload": workflow_run.input_payload,

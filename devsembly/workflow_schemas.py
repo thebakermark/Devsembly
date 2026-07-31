@@ -78,6 +78,17 @@ class WorkflowRunCreate(BaseModel):
         keys = [step.key for step in self.steps]
         if len(keys) != len(set(keys)):
             raise ValueError("workflow step keys must be unique")
+        if self.workflow_kind == "software_delivery" and keys != [
+            "intake",
+            "implement",
+            "validate",
+            "publish",
+            "remember",
+        ]:
+            raise ValueError(
+                "software_delivery requires ordered intake, implement, validate, "
+                "publish, and remember steps"
+            )
         return self
 
 

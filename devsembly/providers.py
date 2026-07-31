@@ -26,6 +26,14 @@ class AICodingProvider(Protocol):
 
 
 class SourceControlProvider(Protocol):
+    async def ensure_work_item(
+        self,
+        task: TaskPacket,
+        workspace: Path,
+        title: str,
+        body: str,
+    ) -> str: ...
+
     async def publish_draft_change_request(
         self,
         task: TaskPacket,
