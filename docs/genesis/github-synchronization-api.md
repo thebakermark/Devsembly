@@ -1,0 +1,29 @@
+# GitHub Synchronization API
+
+`POST /api/v1/internal/projects/{project_id}/github/events` accepts GitHub webhook deliveries.
+The caller must provide `X-GitHub-Delivery`, `X-GitHub-Event`, and
+`X-Hub-Signature-256`. Genesis verifies the SHA-256 HMAC against
+`DEVSEMBLY_GITHUB_WEBHOOK_SECRET` before parsing or persisting provider content.
+
+## Contract and authority
+
+- Provider identities are `github:{repository_id}:{entity_kind}:{node_id-or-id}`. Display names,
+  repository renames, issue numbers, and URLs are aliases, not identities.
+- `(repository_id, delivery_id)` is the delivery idempotency boundary. Exact redelivery returns the
+  recorded result and never emits another audit or outbox event.
+- Entity ordering uses the provider's entity timestamp. Older events are retained as observations,
+  marked out of order, and schedule snapshot reconciliation instead of overwriting current state.
+- `approved > verified > inferred`. Lower-authority input cannot overwrite a higher-authority fact.
+  Different payloads at the same provider position create an open reconciliation conflict.
+- Each entity records `observed_at` and `stale_after`. The initial freshness objective is 30 minutes;
+  a scheduled snapshot reconciler will refresh or flag expired sources.
+
+Successful processing atomically updates the source cursor and conflict queue and writes an audit
+record plus `genesis.project-intelligence.github-event-ingested` to the transactional outbox. A
+delivery is committed as `received` before projection work begins, so a crash can resume it without
+relying on GitHub redelivery. Failed or received deliveries are retryable; uniqueness constraints
+prevent duplicate state and events under concurrent at-least-once delivery.
+
+This slice normalizes Issues, pull requests, reviews, workflow runs/jobs, milestones, checks, refs,
+and commits. Scheduled GitHub snapshot retrieval and Temporal scheduling build on the durable
+reconciliation marker introduced here.

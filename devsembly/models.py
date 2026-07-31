@@ -289,6 +289,88 @@ class ProjectIntelligenceProjection(Base):
     rebuilt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class GitHubDelivery(Base):
+    __tablename__ = "github_deliveries"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('received', 'processed', 'failed')", name="ck_github_deliveries_status"
+        ),
+        UniqueConstraint("repository_id", "delivery_id", name="uq_github_delivery_provider_id"),
+        Index("ix_github_deliveries_project_observed", "project_id", "observed_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    repository_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    delivery_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    event_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    action: Mapped[str | None] = mapped_column(String(80))
+    entity_kind: Mapped[str] = mapped_column(String(80), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(240), nullable=False)
+    payload_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    provider_occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    failure_reason: Mapped[str | None] = mapped_column(Text)
+    out_of_order: Mapped[bool] = mapped_column(default=False, nullable=False)
+
+
+class GitHubSourceState(Base):
+    __tablename__ = "github_source_states"
+    __table_args__ = (
+        CheckConstraint(
+            "authority IN ('inferred', 'verified', 'approved')",
+            name="ck_github_source_authority",
+        ),
+        UniqueConstraint("project_id", "entity_id", name="uq_github_source_entity"),
+        Index("ix_github_source_states_project_stale", "project_id", "stale_after"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    repository_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    entity_kind: Mapped[str] = mapped_column(String(80), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(240), nullable=False)
+    payload_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    authority: Mapped[str] = mapped_column(String(20), nullable=False)
+    last_delivery_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    provider_occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    stale_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    reconciliation_required: Mapped[bool] = mapped_column(default=False, nullable=False)
+
+
+class GitHubReconciliationConflict(Base):
+    __tablename__ = "github_reconciliation_conflicts"
+    __table_args__ = (
+        CheckConstraint("status IN ('open', 'resolved')", name="ck_github_conflicts_status"),
+        UniqueConstraint(
+            "project_id", "entity_id", "incoming_sha256", name="uq_github_conflict_incoming"
+        ),
+        Index("ix_github_conflicts_project_status", "project_id", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    entity_id: Mapped[str] = mapped_column(String(240), nullable=False)
+    current_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    incoming_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    current_authority: Mapped[str] = mapped_column(String(20), nullable=False)
+    incoming_authority: Mapped[str] = mapped_column(String(20), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class ProjectIntelligenceWorkItem(Base):
     __tablename__ = "project_intelligence_work_items"
     __table_args__ = (

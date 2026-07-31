@@ -46,7 +46,7 @@ def test_project_intelligence_schema_and_bootstrap_state() -> None:
         created_at=now,
     )
     projection = build_projection(revision, now)
-    assert len(projection.work_items) == 3
-    assert len(projection.aliases) == 3
+    assert len(projection.work_items) == 4
+    assert len(projection.aliases) == 4
     assert len(projection.graph_nodes) == 4
     assert len(projection.graph_edges) == 2

@@ -24,6 +24,7 @@ from devsembly.errors import (
 )
 from devsembly.evidence_api import router as evidence_router
 from devsembly.genesis_api import router as genesis_router
+from devsembly.github_sync_api import router as github_sync_router
 from devsembly.identity_api import organization_router as identity_organization_router
 from devsembly.identity_api import router as identity_router
 from devsembly.outbox_publisher import worker_readiness
@@ -41,6 +42,7 @@ app.include_router(identity_router)
 app.include_router(identity_organization_router)
 app.include_router(evidence_router)
 app.include_router(pie_router)
+app.include_router(github_sync_router)
 
 
 @app.middleware("http")

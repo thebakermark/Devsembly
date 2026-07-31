@@ -261,6 +261,34 @@
             "uri": "https://github.com/thebakermark/Devsembly/issues/25"
           }
         ]
+      },
+      {
+        "id": "task:pie-26",
+        "title": "GitHub event synchronization and conflict reconciliation",
+        "status": "active",
+        "parent_id": "epic:project-intelligence",
+        "provenance": {
+          "provider": "github",
+          "kind": "implementation-issue",
+          "external_id": "26",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/26",
+          "occurred_at": "2026-07-31T15:07:37Z",
+          "observed_at": "2026-07-31T17:30:00Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Issue #26 is the authoritative active synchronization slice."
+        },
+        "aliases": [
+          {
+            "provider": "github",
+            "account": "thebakermark/Devsembly",
+            "kind": "issue",
+            "external_id": "26",
+            "uri": "https://github.com/thebakermark/Devsembly/issues/26"
+          }
+        ]
       }
     ],
     "current_sprint": null
