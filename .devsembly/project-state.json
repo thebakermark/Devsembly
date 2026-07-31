@@ -304,9 +304,9 @@
           "observed_at": "2026-07-31T22:00:00Z"
         },
         "confidence": {
-          "score": 0.9,
+          "score": 1.0,
           "status": "verified",
-          "explanation": "Implementation and complete local Python validation satisfy issue #27; PostgreSQL and container execution await CI."
+          "explanation": "Issue #27 is complete: validation-status, risk-register, and technical-debt projections are implemented, and full Control Plane CI #60 passed."
         },
         "aliases": [{
           "provider": "github",
@@ -327,7 +327,7 @@
         "title": "PIE assurance projection local gates",
         "status": "passed",
         "kind": "validation-suite",
-        "evidence_ids": ["evidence:local-issue-27"],
+        "evidence_ids": ["evidence:ci-60"],
         "acceptance_criterion_ids": ["criterion:issue-27"],
         "affected_capability_ids": ["capability:project-intelligence"],
         "provenance": {
@@ -339,9 +339,9 @@
           "observed_at": "2026-07-31T22:00:00Z"
         },
         "confidence": {
-          "score": 0.9,
+          "score": 1.0,
           "status": "verified",
-          "explanation": "Ruff, format, strict MyPy, 51 tests, schema validation, Alembic upgrade and downgrade SQL, and diff checks passed. Docker is unavailable locally, so container and PostgreSQL execution await CI."
+          "explanation": "Local gates passed and Control Plane CI #60 verified PostgreSQL tests, migration round-trip and model parity, Docker/Compose builds, and live-stack health."
         }
       },
       {
