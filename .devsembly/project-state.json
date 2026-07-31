@@ -265,7 +265,7 @@
       {
         "id": "task:pie-26",
         "title": "GitHub event synchronization and conflict reconciliation",
-        "status": "active",
+        "status": "completed",
         "parent_id": "epic:project-intelligence",
         "provenance": {
           "provider": "github",
@@ -278,7 +278,7 @@
         "confidence": {
           "score": 1.0,
           "status": "verified",
-          "explanation": "Issue #26 webhook ingestion, restart-safe snapshot repair, authenticated GitHub pagination, durable Temporal scheduling, and governed conflict-queue resolution are implemented; final end-to-end validation remains active work."
+          "explanation": "Issue #26 is complete: webhook ingestion, restart-safe snapshot repair, authenticated GitHub pagination, durable Temporal scheduling, governed conflict resolution, and full Control Plane CI #58 passed."
         },
         "aliases": [
           {
@@ -312,7 +312,7 @@
           "confidence": {
             "score": 1.0,
             "status": "verified",
-            "explanation": "Ruff, formatting, strict MyPy, locally runnable tests, schema validation, and offline migration generation passed."
+            "explanation": "Local gates passed and Control Plane CI #58 verified PostgreSQL tests, migration round-trip and model parity, Docker/Compose builds, and live-stack health."
           }
         },
       {
