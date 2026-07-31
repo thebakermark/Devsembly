@@ -12,7 +12,8 @@ from devsembly.factory import (
     execute_autonomous_run,
     independent_review,
 )
-from devsembly.temporal_workflows import CommittedWorkflow
+from devsembly.github_provider import reconcile_github_page
+from devsembly.temporal_workflows import CommittedWorkflow, GitHubSnapshotWorkflow
 
 
 async def main() -> None:
@@ -21,8 +22,13 @@ async def main() -> None:
     worker = Worker(
         client,
         task_queue=task_queue,
-        workflows=[FactoryWorkflow, CommittedWorkflow],
-        activities=[create_task_packet, execute_autonomous_run, independent_review],
+        workflows=[FactoryWorkflow, CommittedWorkflow, GitHubSnapshotWorkflow],
+        activities=[
+            create_task_packet,
+            execute_autonomous_run,
+            independent_review,
+            reconcile_github_page,
+        ],
     )
     await worker.run()
 

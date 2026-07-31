@@ -6,6 +6,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
+from temporalio.client import Client
+from temporalio.common import WorkflowIDReusePolicy
+from temporalio.exceptions import WorkflowAlreadyStartedError
 
 from devsembly.auth import internal_control_authorized
 from devsembly.github_sync import (
@@ -16,6 +19,7 @@ from devsembly.github_sync import (
     normalize_snapshot_entity,
     verify_signature,
 )
+from devsembly.temporal_workflows import GitHubSnapshotWorkflow
 
 router = APIRouter(prefix="/api/v1/internal/projects/{project_id}/github", tags=["GitHub Sync"])
 
@@ -28,6 +32,12 @@ class SnapshotEntity(BaseModel):
 class SnapshotReconciliationRequest(BaseModel):
     repository_id: str = Field(min_length=1, max_length=80)
     entities: list[SnapshotEntity] = Field(max_length=500)
+
+
+class SnapshotScheduleRequest(BaseModel):
+    repository_id: str = Field(min_length=1, max_length=80)
+    repository: str = Field(pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", max_length=200)
+    interval_seconds: int = Field(default=1800, ge=300, le=86400)
 
 
 @router.post("/events", status_code=status.HTTP_202_ACCEPTED)
@@ -88,3 +98,33 @@ async def reconcile_github_snapshot(
         "out_of_order": result.out_of_order,
         "stale_sources": result.stale_sources,
     }
+
+
+@router.post(
+    "/snapshot-schedule",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(internal_control_authorized)],
+)
+async def schedule_github_snapshot(
+    project_id: uuid.UUID,
+    request: SnapshotScheduleRequest,
+) -> dict[str, object]:
+    workflow_id = f"genesis-github-snapshot-{project_id}-{request.repository_id}"
+    client = await Client.connect(os.getenv("DEVSEMBLY_TEMPORAL_ADDRESS", "localhost:7233"))
+    created = True
+    try:
+        await client.start_workflow(
+            GitHubSnapshotWorkflow.run,
+            {
+                "project_id": str(project_id),
+                "repository_id": request.repository_id,
+                "repository": request.repository,
+                "interval_seconds": request.interval_seconds,
+            },
+            id=workflow_id,
+            task_queue=os.getenv("DEVSEMBLY_TEMPORAL_TASK_QUEUE", "devsembly-factory"),
+            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+        )
+    except WorkflowAlreadyStartedError:
+        created = False
+    return {"workflow_id": workflow_id, "created": created, "status": "scheduled"}

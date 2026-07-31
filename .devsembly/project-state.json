@@ -273,12 +273,12 @@
           "external_id": "26",
           "uri": "https://github.com/thebakermark/Devsembly/issues/26",
           "occurred_at": "2026-07-31T15:07:37Z",
-          "observed_at": "2026-07-31T18:00:00Z"
+          "observed_at": "2026-07-31T19:00:00Z"
         },
         "confidence": {
           "score": 1.0,
           "status": "verified",
-          "explanation": "Issue #26 webhook ingestion and restart-safe snapshot repair boundaries are implemented; provider scheduling and conflict resolution remain active work."
+          "explanation": "Issue #26 webhook ingestion, restart-safe snapshot repair, authenticated GitHub pagination, and durable Temporal scheduling are implemented; governed conflict-queue resolution remains active work."
         },
         "aliases": [
           {
@@ -313,6 +313,25 @@
           "score": 0.8,
           "status": "verified",
           "explanation": "Ruff, format, strict MyPy, 46 local tests, repository validation, and Alembic offline upgrade passed; PostgreSQL-only tests await CI."
+        }
+      },
+      {
+        "id": "validation:github-provider-scheduling",
+        "title": "GitHub provider retrieval and Temporal scheduling local gates",
+        "status": "passed",
+        "kind": "validation-suite",
+        "provenance": {
+          "provider": "repository",
+          "kind": "local-validation",
+          "external_id": "issue-26-provider-scheduling",
+          "uri": null,
+          "occurred_at": "2026-07-31T19:00:00Z",
+          "observed_at": "2026-07-31T19:00:00Z"
+        },
+        "confidence": {
+          "score": 0.8,
+          "status": "verified",
+          "explanation": "Ruff, format, strict MyPy, 50 local tests, Temporal sandbox loading, Alembic offline upgrade, and diff checks passed; PostgreSQL, Docker, Compose, and live-stack gates await CI."
         }
       }
     ]

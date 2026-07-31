@@ -36,5 +36,13 @@ and conflict rules as webhook ingestion, then flags sources whose freshness dead
 Stale detection never changes canonical facts; it emits
 `genesis.project-intelligence.github-sources-stale` once when repair first becomes required.
 
-Temporal scheduling and authenticated GitHub page retrieval remain the provider adapter's
-responsibility; this endpoint is the durable, restart-safe application boundary they call.
+The Temporal worker registers `GitHubSnapshotWorkflow` and its page-reconciliation Activity. The
+Activity reads `DEVSEMBLY_GITHUB_TOKEN` only during execution, sends it to the configured GitHub API
+origin, follows only same-origin `rel="next"` links, and never records the credential in workflow
+history or persistence. Each page is reconciled independently, so Temporal retries safely replay a
+partially completed snapshot through deterministic delivery identities.
+
+The workflow covers issues, pull requests, milestones, branches, commits, and Actions runs. After a
+complete pass it waits for the configured interval and continues as new, bounding workflow history.
+Schedulers use `genesis-github-snapshot-{project_id}-{repository_id}` as the workflow ID so two
+schedulers cannot create competing reconciliation loops.
