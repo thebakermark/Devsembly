@@ -287,6 +287,13 @@ class ProjectIntelligenceProjection(Base):
     )
     source_version: Mapped[int] = mapped_column(Integer, nullable=False)
     rebuilt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    validation_results: Mapped[list[dict[str, object]]] = mapped_column(
+        JSONB, nullable=False, default=list
+    )
+    risks: Mapped[list[dict[str, object]]] = mapped_column(JSONB, nullable=False, default=list)
+    technical_debt: Mapped[list[dict[str, object]]] = mapped_column(
+        JSONB, nullable=False, default=list
+    )
 
 
 class GitHubDelivery(Base):

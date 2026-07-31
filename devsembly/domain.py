@@ -413,12 +413,92 @@ class ProjectGraphEdge:
 
 
 @dataclass(frozen=True, slots=True)
+class ProjectValidationResult:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    stable_id: str
+    title: str
+    status: str
+    evidence_ids: tuple[str, ...]
+    acceptance_criterion_ids: tuple[str, ...]
+    stale_at: datetime | None
+    superseded_by: str | None
+    affected_capability_ids: tuple[str, ...]
+    source_revision_id: uuid.UUID
+    source_provider: str
+    source_kind: str
+    source_external_id: str | None
+    source_uri: str | None
+    source_occurred_at: datetime | None
+    source_observed_at: datetime
+    assertion_status: ProjectStateAssertionStatus
+    confidence: Decimal
+    confidence_explanation: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectRisk:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    stable_id: str
+    title: str
+    status: str
+    owner_id: str
+    likelihood: Decimal
+    impact: Decimal
+    mitigation: str
+    trigger: str
+    review_at: datetime | None
+    affected_capability_ids: tuple[str, ...]
+    affected_dependency_ids: tuple[str, ...]
+    source_revision_id: uuid.UUID
+    source_provider: str
+    source_kind: str
+    source_external_id: str | None
+    source_uri: str | None
+    source_occurred_at: datetime | None
+    source_observed_at: datetime
+    assertion_status: ProjectStateAssertionStatus
+    confidence: Decimal
+    confidence_explanation: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectTechnicalDebt:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    stable_id: str
+    title: str
+    status: str
+    owner_id: str
+    principal: Decimal
+    interest: Decimal
+    impact: str
+    retirement_criteria: str
+    affected_capability_ids: tuple[str, ...]
+    affected_dependency_ids: tuple[str, ...]
+    source_revision_id: uuid.UUID
+    source_provider: str
+    source_kind: str
+    source_external_id: str | None
+    source_uri: str | None
+    source_occurred_at: datetime | None
+    source_observed_at: datetime
+    assertion_status: ProjectStateAssertionStatus
+    confidence: Decimal
+    confidence_explanation: str
+
+
+@dataclass(frozen=True, slots=True)
 class ProjectIntelligenceProjection:
     checkpoint: ProjectProjectionCheckpoint
     work_items: tuple[ProjectWorkItem, ...]
     aliases: tuple[ProjectProviderAlias, ...]
     graph_nodes: tuple[ProjectGraphNode, ...]
     graph_edges: tuple[ProjectGraphEdge, ...]
+    validation_results: tuple[ProjectValidationResult, ...] = ()
+    risks: tuple[ProjectRisk, ...] = ()
+    technical_debt: tuple[ProjectTechnicalDebt, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

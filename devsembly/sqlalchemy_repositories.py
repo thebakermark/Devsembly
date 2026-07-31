@@ -50,6 +50,7 @@ from devsembly.domain import (
     WorkflowStepStatus,
 )
 from devsembly.errors import DuplicateResourceError, InvalidTransitionError, StaleVersionError
+from devsembly.pie_projection import build_projection
 
 
 def _organization(model: models.Organization) -> Organization:
@@ -662,6 +663,40 @@ class SqlAlchemyProjectIntelligenceProjectionRepository:
                 source_revision_id=projection.checkpoint.source_revision_id,
                 source_version=projection.checkpoint.source_version,
                 rebuilt_at=projection.checkpoint.rebuilt_at,
+                validation_results=[
+                    {
+                        "id": item.stable_id,
+                        "status": item.status,
+                        "evidence_ids": list(item.evidence_ids),
+                        "acceptance_criterion_ids": list(item.acceptance_criterion_ids),
+                        "affected_capability_ids": list(item.affected_capability_ids),
+                    }
+                    for item in projection.validation_results
+                ],
+                risks=[
+                    {
+                        "id": item.stable_id,
+                        "status": item.status,
+                        "owner_id": item.owner_id,
+                        "likelihood": str(item.likelihood),
+                        "impact": str(item.impact),
+                        "affected_capability_ids": list(item.affected_capability_ids),
+                        "affected_dependency_ids": list(item.affected_dependency_ids),
+                    }
+                    for item in projection.risks
+                ],
+                technical_debt=[
+                    {
+                        "id": item.stable_id,
+                        "status": item.status,
+                        "owner_id": item.owner_id,
+                        "principal": str(item.principal),
+                        "interest": str(item.interest),
+                        "affected_capability_ids": list(item.affected_capability_ids),
+                        "affected_dependency_ids": list(item.affected_dependency_ids),
+                    }
+                    for item in projection.technical_debt
+                ],
             )
         )
         self._session.add_all(
@@ -795,6 +830,12 @@ class SqlAlchemyProjectIntelligenceProjectionRepository:
                 models.ProjectIntelligenceGraphEdge.stable_id,
             )
         )
+        revision_model = await self._session.get(
+            models.ProjectStateRevision, checkpoint.source_revision_id
+        )
+        if revision_model is None:
+            raise RuntimeError("project intelligence projection source revision is missing")
+        assurance = build_projection(_project_state_revision(revision_model), checkpoint.rebuilt_at)
         return ProjectIntelligenceProjection(
             checkpoint=ProjectProjectionCheckpoint(
                 project_id=checkpoint.project_id,
@@ -819,6 +860,9 @@ class SqlAlchemyProjectIntelligenceProjectionRepository:
             ),
             graph_nodes=tuple(_project_graph_node(item) for item in nodes),
             graph_edges=tuple(_project_graph_edge(item) for item in edges),
+            validation_results=assurance.validation_results,
+            risks=assurance.risks,
+            technical_debt=assurance.technical_debt,
         )
 
 

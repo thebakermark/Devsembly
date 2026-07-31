@@ -130,6 +130,50 @@ def _projected_payload() -> dict[str, object]:
             },
             "dependencies": {"nodes": [], "edges": []},
         },
+        "validation": {
+            "status": "partial",
+            "results": [
+                {
+                    **_item("validation:unit", "Unit tests"),
+                    "status": "passed",
+                    "evidence_ids": ["evidence:test-run-1"],
+                    "acceptance_criterion_ids": ["criterion:27-1"],
+                    "affected_capability_ids": ["capability:pie"],
+                },
+                {
+                    **_item("validation:security", "Security review"),
+                    "status": "unverified",
+                    "evidence_ids": [],
+                    "acceptance_criterion_ids": ["criterion:27-5"],
+                    "affected_capability_ids": ["capability:pie"],
+                    "stale_at": "2026-08-01T00:00:00Z",
+                },
+            ],
+        },
+        "risks": [
+            {
+                **_item("risk:stale-evidence", "Stale assurance"),
+                "owner_id": "principal:owner",
+                "likelihood": 0.5,
+                "impact": 0.8,
+                "mitigation": "Re-run required gates.",
+                "trigger": "Evidence expires.",
+                "affected_capability_ids": ["capability:pie"],
+                "affected_dependency_ids": [],
+            }
+        ],
+        "technical_debt": [
+            {
+                **_item("debt:manual-evidence", "Manual evidence mapping"),
+                "owner_id": "principal:owner",
+                "principal": 3,
+                "interest": 0.5,
+                "impact": "Slower assurance updates.",
+                "retirement_criteria": "Automated evidence mapping is validated.",
+                "affected_capability_ids": ["capability:pie"],
+                "affected_dependency_ids": [],
+            }
+        ],
     }
     return payload
 
@@ -220,6 +264,13 @@ async def test_project_state_builds_readable_rebuildable_work_and_graph_projecti
             }
             assert graph["edges"][0]["relationship"] == "implements"
 
+            assurance = (await client.get(f"{path}/assurance")).json()
+            assert assurance["verified_claims"] == 1
+            assert assurance["unverified_claims"] == 1
+            assert assurance["open_risks"] == 1
+            assert assurance["debt_principal"] == "3"
+            assert (await client.get(f"{path}/risks")).json()[0]["owner_id"] == "principal:owner"
+
             factory.store.project_intelligence_projections.clear()
             assert (await client.get(f"{path}/projection")).status_code == 404
             rebuilt = await client.post(f"{path}/projection/rebuild", json={"version": 1})
@@ -308,3 +359,32 @@ def test_openapi_exposes_project_intelligence_state_contract() -> None:
     assert "post" in paths[f"{prefix}/projection/rebuild"]
     assert "get" in paths[f"{prefix}/work-items"]
     assert "get" in paths[f"{prefix}/graphs/{{graph_kind}}"]
+    assert "get" in paths[f"{prefix}/assurance"]
+    assert "get" in paths[f"{prefix}/validation-results"]
+    assert "get" in paths[f"{prefix}/risks"]
+    assert "get" in paths[f"{prefix}/technical-debt"]
+
+
+async def test_verified_validation_requires_evidence_and_impacts_are_project_scoped() -> None:
+    factory = MemoryUnitOfWorkFactory()
+    app.dependency_overrides[get_genesis_service] = lambda: GenesisService(factory)
+    app.dependency_overrides[get_project_intelligence_service] = lambda: ProjectIntelligenceService(
+        factory
+    )
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            organization_id, initiative_id, project_id = await _project(client)
+            path = f"/api/v1/organizations/{organization_id}/initiatives/{initiative_id}/projects/{project_id}/project-intelligence/revisions"
+            payload = _projected_payload()
+            payload["state"]["validation"]["results"][0]["evidence_ids"] = []  # type: ignore[index]
+            response = await client.post(path, json=payload)
+            assert response.status_code == 422
+            assert "must be unverified" in response.json()["detail"]
+
+            payload = _projected_payload()
+            payload["state"]["risks"][0]["affected_capability_ids"] = ["capability:other-tenant"]  # type: ignore[index]
+            response = await client.post(path, json=payload)
+            assert response.status_code == 422
+            assert "unknown capability" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()

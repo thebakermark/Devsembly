@@ -45,3 +45,22 @@ emits `genesis.project-intelligence.projection-rebuilt` with source revision and
 
 The projection is a read model, not a second source of truth. It may be deleted and rebuilt from the
 revision log without changing canonical history.
+
+## Assurance projections
+
+`GET .../project-intelligence/assurance` returns an executive roll-up of evidence-backed validation
+claims, stale or superseded claims, open risk exposure, and technical-debt principal and interest.
+Supporting records are exposed by `GET .../validation-results`, `GET .../risks`, and
+`GET .../technical-debt`.
+
+A conclusive validation status (`passed` or `failed`) MUST include at least one opaque project
+evidence identifier. Claims without evidence MUST be `unverified`; stale and superseded metadata
+remains visible. Risks retain owner, likelihood, impact, mitigation, trigger, review state,
+provenance, confidence, and capability/dependency impacts. Technical debt retains owner, principal,
+interest, impact, retirement criteria, provenance, confidence, and the same impact links.
+
+These endpoints inherit the organization, initiative, and project authorization boundary. Impact
+identifiers must resolve inside that project projection, and responses expose evidence identifiers
+rather than evidence contents. Evidence content remains behind the separately authorized evidence
+API. Migration `0014_pie_assurance` adds durable JSONB projection caches; rebuilds derive them from
+the selected immutable project-state revision.

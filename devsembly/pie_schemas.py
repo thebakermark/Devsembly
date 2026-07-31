@@ -142,6 +142,43 @@ class ProjectGraphRead(BaseModel):
     edges: list[ProjectGraphEdgeRead]
 
 
+class AssuranceItemRead(BaseModel):
+    id: str
+    title: str
+    status: str
+    owner_id: str | None = None
+    evidence_ids: list[str] = Field(default_factory=list)
+    acceptance_criterion_ids: list[str] = Field(default_factory=list)
+    stale_at: datetime | None = None
+    superseded_by: str | None = None
+    likelihood: Decimal | None = None
+    impact_score: Decimal | None = None
+    mitigation: str | None = None
+    trigger: str | None = None
+    review_at: datetime | None = None
+    principal: Decimal | None = None
+    interest: Decimal | None = None
+    impact: str | None = None
+    retirement_criteria: str | None = None
+    affected_capability_ids: list[str] = Field(default_factory=list)
+    affected_dependency_ids: list[str] = Field(default_factory=list)
+    source_revision_id: uuid.UUID
+    provenance: ProjectionProvenanceRead
+    assertion: ProjectStateAssertionRead
+
+
+class ExecutiveAssuranceRead(BaseModel):
+    validation_status: str
+    verified_claims: int
+    unverified_claims: int
+    stale_claims: int
+    open_risks: int
+    risk_exposure: Decimal
+    open_debt_items: int
+    debt_principal: Decimal
+    debt_interest: Decimal
+
+
 class ProjectIntelligenceProjectionRead(BaseModel):
     project_id: uuid.UUID
     source_revision_id: uuid.UUID
@@ -149,3 +186,7 @@ class ProjectIntelligenceProjectionRead(BaseModel):
     rebuilt_at: datetime
     work_items: list[ProjectWorkItemRead]
     graphs: list[ProjectGraphRead]
+    validation_results: list[AssuranceItemRead]
+    risks: list[AssuranceItemRead]
+    technical_debt: list[AssuranceItemRead]
+    executive_assurance: ExecutiveAssuranceRead

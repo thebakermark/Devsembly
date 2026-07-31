@@ -289,6 +289,32 @@
             "uri": "https://github.com/thebakermark/Devsembly/issues/26"
           }
         ]
+      },
+      {
+        "id": "task:pie-27",
+        "title": "Validation, risk register, and technical-debt projections",
+        "status": "completed",
+        "parent_id": "epic:project-intelligence",
+        "provenance": {
+          "provider": "github",
+          "kind": "implementation-issue",
+          "external_id": "27",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/27",
+          "occurred_at": "2026-07-31T15:07:38Z",
+          "observed_at": "2026-07-31T22:00:00Z"
+        },
+        "confidence": {
+          "score": 0.9,
+          "status": "verified",
+          "explanation": "Implementation and complete local Python validation satisfy issue #27; PostgreSQL and container execution await CI."
+        },
+        "aliases": [{
+          "provider": "github",
+          "account": "thebakermark/Devsembly",
+          "kind": "issue",
+          "external_id": "27",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/27"
+        }]
       }
     ],
     "current_sprint": null
@@ -297,10 +323,35 @@
     "status": "passed",
     "results": [
       {
+        "id": "validation:pie-assurance-projections",
+        "title": "PIE assurance projection local gates",
+        "status": "passed",
+        "kind": "validation-suite",
+        "evidence_ids": ["evidence:local-issue-27"],
+        "acceptance_criterion_ids": ["criterion:issue-27"],
+        "affected_capability_ids": ["capability:project-intelligence"],
+        "provenance": {
+          "provider": "repository",
+          "kind": "local-validation",
+          "external_id": "issue-27-assurance-projections",
+          "uri": null,
+          "occurred_at": "2026-07-31T22:00:00Z",
+          "observed_at": "2026-07-31T22:00:00Z"
+        },
+        "confidence": {
+          "score": 0.9,
+          "status": "verified",
+          "explanation": "Ruff, format, strict MyPy, 51 tests, schema validation, Alembic upgrade and downgrade SQL, and diff checks passed. Docker is unavailable locally, so container and PostgreSQL execution await CI."
+        }
+      },
+      {
         "id": "validation:github-conflict-resolution",
         "title": "GitHub governed conflict resolution local gates",
         "status": "passed",
         "kind": "validation-suite",
+        "evidence_ids": ["evidence:ci-58"],
+        "acceptance_criterion_ids": ["criterion:issue-26-conflict-resolution"],
+        "affected_capability_ids": ["capability:project-intelligence"],
         "provenance": {
           "provider": "repository",
           "kind": "local-validation",
@@ -320,6 +371,9 @@
         "title": "GitHub snapshot reconciliation local gates",
         "status": "passed",
         "kind": "validation-suite",
+        "evidence_ids": ["evidence:local-issue-26-snapshot"],
+        "acceptance_criterion_ids": ["criterion:issue-26-snapshot-reconciliation"],
+        "affected_capability_ids": ["capability:project-intelligence"],
         "provenance": {
           "provider": "repository",
           "kind": "local-validation",
@@ -339,6 +393,9 @@
         "title": "GitHub provider retrieval and Temporal scheduling local gates",
         "status": "passed",
         "kind": "validation-suite",
+        "evidence_ids": ["evidence:local-issue-26-provider"],
+        "acceptance_criterion_ids": ["criterion:issue-26-provider-scheduling"],
+        "affected_capability_ids": ["capability:project-intelligence"],
         "provenance": {
           "provider": "repository",
           "kind": "local-validation",

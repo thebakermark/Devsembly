@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
@@ -12,10 +13,15 @@ from devsembly.domain import (
     ProjectGraphNode,
     ProjectIntelligenceProjection,
     ProjectProviderAlias,
+    ProjectRisk,
     ProjectStateRevision,
+    ProjectTechnicalDebt,
+    ProjectValidationResult,
     ProjectWorkItem,
 )
 from devsembly.pie_schemas import (
+    AssuranceItemRead,
+    ExecutiveAssuranceRead,
     ProjectGraphEdgeRead,
     ProjectGraphNodeRead,
     ProjectGraphRead,
@@ -94,7 +100,12 @@ def _aliases_for(
 
 
 def _provenance_read(
-    item: ProjectWorkItem | ProjectGraphNode | ProjectGraphEdge,
+    item: ProjectWorkItem
+    | ProjectGraphNode
+    | ProjectGraphEdge
+    | ProjectValidationResult
+    | ProjectRisk
+    | ProjectTechnicalDebt,
 ) -> ProjectionProvenanceRead:
     return ProjectionProvenanceRead(
         provider=item.source_provider,
@@ -107,7 +118,12 @@ def _provenance_read(
 
 
 def _assertion_read(
-    item: ProjectWorkItem | ProjectGraphNode | ProjectGraphEdge,
+    item: ProjectWorkItem
+    | ProjectGraphNode
+    | ProjectGraphEdge
+    | ProjectValidationResult
+    | ProjectRisk
+    | ProjectTechnicalDebt,
 ) -> ProjectStateAssertionRead:
     return ProjectStateAssertionRead(
         status=item.assertion_status,
@@ -172,6 +188,74 @@ def _graph_read(
 def _projection_read(
     projection: ProjectIntelligenceProjection,
 ) -> ProjectIntelligenceProjectionRead:
+    validations = [
+        AssuranceItemRead(
+            id=item.stable_id,
+            title=item.title,
+            status=item.status,
+            evidence_ids=list(item.evidence_ids),
+            acceptance_criterion_ids=list(item.acceptance_criterion_ids),
+            stale_at=item.stale_at,
+            superseded_by=item.superseded_by,
+            affected_capability_ids=list(item.affected_capability_ids),
+            source_revision_id=item.source_revision_id,
+            provenance=_provenance_read(item),
+            assertion=_assertion_read(item),
+        )
+        for item in projection.validation_results
+    ]
+    risks = [
+        AssuranceItemRead(
+            id=item.stable_id,
+            title=item.title,
+            status=item.status,
+            owner_id=item.owner_id,
+            likelihood=item.likelihood,
+            impact_score=item.impact,
+            mitigation=item.mitigation,
+            trigger=item.trigger,
+            review_at=item.review_at,
+            affected_capability_ids=list(item.affected_capability_ids),
+            affected_dependency_ids=list(item.affected_dependency_ids),
+            source_revision_id=item.source_revision_id,
+            provenance=_provenance_read(item),
+            assertion=_assertion_read(item),
+        )
+        for item in projection.risks
+    ]
+    debt = [
+        AssuranceItemRead(
+            id=item.stable_id,
+            title=item.title,
+            status=item.status,
+            owner_id=item.owner_id,
+            principal=item.principal,
+            interest=item.interest,
+            impact=item.impact,
+            retirement_criteria=item.retirement_criteria,
+            affected_capability_ids=list(item.affected_capability_ids),
+            affected_dependency_ids=list(item.affected_dependency_ids),
+            source_revision_id=item.source_revision_id,
+            provenance=_provenance_read(item),
+            assertion=_assertion_read(item),
+        )
+        for item in projection.technical_debt
+    ]
+    verified = sum(
+        item.status in {"passed", "failed"} and bool(item.evidence_ids)
+        for item in projection.validation_results
+    )
+    stale = sum(
+        item.stale_at is not None or item.superseded_by is not None
+        for item in projection.validation_results
+    )
+    validation_status = (
+        "unverified"
+        if not projection.validation_results or verified != len(projection.validation_results)
+        else "passed"
+        if all(item.status == "passed" for item in projection.validation_results)
+        else "attention_required"
+    )
     return ProjectIntelligenceProjectionRead(
         project_id=projection.checkpoint.project_id,
         source_revision_id=projection.checkpoint.source_revision_id,
@@ -182,6 +266,43 @@ def _projection_read(
             _graph_read(projection, ProjectGraphKind.CAPABILITY),
             _graph_read(projection, ProjectGraphKind.DEPENDENCY),
         ],
+        validation_results=validations,
+        risks=risks,
+        technical_debt=debt,
+        executive_assurance=ExecutiveAssuranceRead(
+            validation_status=validation_status,
+            verified_claims=verified,
+            unverified_claims=len(projection.validation_results) - verified,
+            stale_claims=stale,
+            open_risks=sum(item.status not in {"closed", "accepted"} for item in projection.risks),
+            risk_exposure=sum(
+                (
+                    item.likelihood * item.impact
+                    for item in projection.risks
+                    if item.status not in {"closed", "accepted"}
+                ),
+                Decimal(0),
+            ),
+            open_debt_items=sum(
+                item.status not in {"retired", "closed"} for item in projection.technical_debt
+            ),
+            debt_principal=sum(
+                (
+                    item.principal
+                    for item in projection.technical_debt
+                    if item.status not in {"retired", "closed"}
+                ),
+                Decimal(0),
+            ),
+            debt_interest=sum(
+                (
+                    item.interest
+                    for item in projection.technical_debt
+                    if item.status not in {"retired", "closed"}
+                ),
+                Decimal(0),
+            ),
+        ),
     )
 
 
@@ -236,6 +357,42 @@ async def list_project_work_items(
 ) -> list[ProjectWorkItemRead]:
     projection = await service.projection(organization_id, initiative_id, project_id)
     return [_work_item_read(projection, item) for item in projection.work_items]
+
+
+@router.get("/assurance", response_model=ExecutiveAssuranceRead)
+async def get_executive_assurance(
+    organization_id: uuid.UUID, initiative_id: uuid.UUID, project_id: uuid.UUID, service: Service
+) -> ExecutiveAssuranceRead:
+    return _projection_read(
+        await service.projection(organization_id, initiative_id, project_id)
+    ).executive_assurance
+
+
+@router.get("/validation-results", response_model=list[AssuranceItemRead])
+async def list_validation_results(
+    organization_id: uuid.UUID, initiative_id: uuid.UUID, project_id: uuid.UUID, service: Service
+) -> list[AssuranceItemRead]:
+    return _projection_read(
+        await service.projection(organization_id, initiative_id, project_id)
+    ).validation_results
+
+
+@router.get("/risks", response_model=list[AssuranceItemRead])
+async def list_risks(
+    organization_id: uuid.UUID, initiative_id: uuid.UUID, project_id: uuid.UUID, service: Service
+) -> list[AssuranceItemRead]:
+    return _projection_read(
+        await service.projection(organization_id, initiative_id, project_id)
+    ).risks
+
+
+@router.get("/technical-debt", response_model=list[AssuranceItemRead])
+async def list_technical_debt(
+    organization_id: uuid.UUID, initiative_id: uuid.UUID, project_id: uuid.UUID, service: Service
+) -> list[AssuranceItemRead]:
+    return _projection_read(
+        await service.projection(organization_id, initiative_id, project_id)
+    ).technical_debt
 
 
 @router.get("/graphs/{graph_kind}", response_model=ProjectGraphRead)

@@ -12,8 +12,11 @@ from devsembly.domain import (
     ProjectIntelligenceProjection,
     ProjectProjectionCheckpoint,
     ProjectProviderAlias,
+    ProjectRisk,
     ProjectStateAssertionStatus,
     ProjectStateRevision,
+    ProjectTechnicalDebt,
+    ProjectValidationResult,
     ProjectWorkItem,
     ProjectWorkItemKind,
 )
@@ -81,6 +84,26 @@ def _list(value: object, path: str) -> list[object]:
     if not isinstance(value, list):
         raise ProjectStateValidationError(f"{path} must be an array")
     return value
+
+
+def _decimal(value: object, path: str, *, minimum: int = 0, maximum: int | None = None) -> Decimal:
+    try:
+        result = Decimal(str(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise ProjectStateValidationError(f"{path} must be numeric") from exc
+    if result < minimum or (maximum is not None and result > maximum):
+        limit = (
+            f" between {minimum} and {maximum}" if maximum is not None else f" at least {minimum}"
+        )
+        raise ProjectStateValidationError(f"{path} must be{limit}")
+    return result
+
+
+def _text_list(value: object, path: str) -> tuple[str, ...]:
+    items = tuple(_text(item, f"{path}[{index}]") for index, item in enumerate(_list(value, path)))
+    if len(items) != len(set(items)):
+        raise ProjectStateValidationError(f"{path} must not contain duplicates")
+    return items
 
 
 def _assertion(
@@ -343,6 +366,163 @@ def build_projection(
     if len(alias_keys) != len(set(alias_keys)):
         raise ProjectStateValidationError("provider aliases must be unique within a project")
 
+    capability_ids = {
+        item.stable_id for item in nodes if item.graph_kind is ProjectGraphKind.CAPABILITY
+    }
+    dependency_ids = {
+        item.stable_id for item in nodes if item.graph_kind is ProjectGraphKind.DEPENDENCY
+    }
+    validation_results: list[ProjectValidationResult] = []
+    validation = _mapping(state.get("validation", {}), "state.validation")
+    for index, raw in enumerate(_list(validation.get("results", []), "state.validation.results")):
+        path = f"state.validation.results[{index}]"
+        validation_data = _mapping(raw, path)
+        evidence_ids = _text_list(validation_data.get("evidence_ids", []), f"{path}.evidence_ids")
+        status = _text(validation_data.get("status"), f"{path}.status")
+        if status in {"passed", "failed"} and not evidence_ids:
+            raise ProjectStateValidationError(
+                f"{path}.status must be unverified when no evidence_ids are supplied"
+            )
+        affected = _text_list(
+            validation_data.get("affected_capability_ids", []), f"{path}.affected_capability_ids"
+        )
+        if not set(affected).issubset(capability_ids):
+            raise ProjectStateValidationError(f"{path} references an unknown capability")
+        provider, source_kind, external_id, uri, occurred_at, observed_at = _provenance(
+            validation_data, path
+        )
+        assertion_status, confidence, explanation = _assertion(validation_data, path)
+        validation_results.append(
+            ProjectValidationResult(
+                id=uuid.uuid4(),
+                project_id=revision.project_id,
+                stable_id=_text(validation_data.get("id"), f"{path}.id"),
+                title=_text(validation_data.get("title"), f"{path}.title"),
+                status=status,
+                evidence_ids=evidence_ids,
+                acceptance_criterion_ids=_text_list(
+                    validation_data.get("acceptance_criterion_ids", []),
+                    f"{path}.acceptance_criterion_ids",
+                ),
+                stale_at=_datetime(
+                    validation_data.get("stale_at"), f"{path}.stale_at", optional=True
+                ),
+                superseded_by=_optional_text(
+                    validation_data.get("superseded_by"), f"{path}.superseded_by"
+                ),
+                affected_capability_ids=affected,
+                source_revision_id=revision.id,
+                source_provider=provider,
+                source_kind=source_kind,
+                source_external_id=external_id,
+                source_uri=uri,
+                source_occurred_at=occurred_at,
+                source_observed_at=observed_at,
+                assertion_status=assertion_status,
+                confidence=confidence,
+                confidence_explanation=explanation,
+            )
+        )
+
+    def impacts(item: Mapping[str, object], path: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        capabilities = _text_list(
+            item.get("affected_capability_ids", []), f"{path}.affected_capability_ids"
+        )
+        dependencies = _text_list(
+            item.get("affected_dependency_ids", []), f"{path}.affected_dependency_ids"
+        )
+        if not set(capabilities).issubset(capability_ids) or not set(dependencies).issubset(
+            dependency_ids
+        ):
+            raise ProjectStateValidationError(
+                f"{path} references an unknown capability or dependency"
+            )
+        return capabilities, dependencies
+
+    risks: list[ProjectRisk] = []
+    for index, raw in enumerate(_list(state.get("risks", []), "state.risks")):
+        path = f"state.risks[{index}]"
+        risk_data = _mapping(raw, path)
+        capabilities, dependencies = impacts(risk_data, path)
+        provider, source_kind, external_id, uri, occurred_at, observed_at = _provenance(
+            risk_data, path
+        )
+        assertion_status, confidence, explanation = _assertion(risk_data, path)
+        risks.append(
+            ProjectRisk(
+                id=uuid.uuid4(),
+                project_id=revision.project_id,
+                stable_id=_text(risk_data.get("id"), f"{path}.id"),
+                title=_text(risk_data.get("title"), f"{path}.title"),
+                status=_text(risk_data.get("status"), f"{path}.status"),
+                owner_id=_text(risk_data.get("owner_id"), f"{path}.owner_id"),
+                likelihood=_decimal(risk_data.get("likelihood"), f"{path}.likelihood", maximum=1),
+                impact=_decimal(risk_data.get("impact"), f"{path}.impact", maximum=1),
+                mitigation=_text(risk_data.get("mitigation"), f"{path}.mitigation"),
+                trigger=_text(risk_data.get("trigger"), f"{path}.trigger"),
+                review_at=_datetime(risk_data.get("review_at"), f"{path}.review_at", optional=True),
+                affected_capability_ids=capabilities,
+                affected_dependency_ids=dependencies,
+                source_revision_id=revision.id,
+                source_provider=provider,
+                source_kind=source_kind,
+                source_external_id=external_id,
+                source_uri=uri,
+                source_occurred_at=occurred_at,
+                source_observed_at=observed_at,
+                assertion_status=assertion_status,
+                confidence=confidence,
+                confidence_explanation=explanation,
+            )
+        )
+
+    technical_debt: list[ProjectTechnicalDebt] = []
+    for index, raw in enumerate(_list(state.get("technical_debt", []), "state.technical_debt")):
+        path = f"state.technical_debt[{index}]"
+        debt_data = _mapping(raw, path)
+        capabilities, dependencies = impacts(debt_data, path)
+        provider, source_kind, external_id, uri, occurred_at, observed_at = _provenance(
+            debt_data, path
+        )
+        assertion_status, confidence, explanation = _assertion(debt_data, path)
+        technical_debt.append(
+            ProjectTechnicalDebt(
+                id=uuid.uuid4(),
+                project_id=revision.project_id,
+                stable_id=_text(debt_data.get("id"), f"{path}.id"),
+                title=_text(debt_data.get("title"), f"{path}.title"),
+                status=_text(debt_data.get("status"), f"{path}.status"),
+                owner_id=_text(debt_data.get("owner_id"), f"{path}.owner_id"),
+                principal=_decimal(debt_data.get("principal"), f"{path}.principal"),
+                interest=_decimal(debt_data.get("interest"), f"{path}.interest"),
+                impact=_text(debt_data.get("impact"), f"{path}.impact"),
+                retirement_criteria=_text(
+                    debt_data.get("retirement_criteria"), f"{path}.retirement_criteria"
+                ),
+                affected_capability_ids=capabilities,
+                affected_dependency_ids=dependencies,
+                source_revision_id=revision.id,
+                source_provider=provider,
+                source_kind=source_kind,
+                source_external_id=external_id,
+                source_uri=uri,
+                source_occurred_at=occurred_at,
+                source_observed_at=observed_at,
+                assertion_status=assertion_status,
+                confidence=confidence,
+                confidence_explanation=explanation,
+            )
+        )
+
+    for label, values in (
+        ("validation", validation_results),
+        ("risk", risks),
+        ("technical debt", technical_debt),
+    ):
+        stable_ids = [item.stable_id for item in values]
+        if len(stable_ids) != len(set(stable_ids)):
+            raise ProjectStateValidationError(f"{label} stable IDs must be unique within a project")
+
     return ProjectIntelligenceProjection(
         checkpoint=ProjectProjectionCheckpoint(
             project_id=revision.project_id,
@@ -354,4 +534,7 @@ def build_projection(
         aliases=tuple(aliases),
         graph_nodes=tuple(nodes),
         graph_edges=tuple(edges),
+        validation_results=tuple(validation_results),
+        risks=tuple(risks),
+        technical_debt=tuple(technical_debt),
     )
