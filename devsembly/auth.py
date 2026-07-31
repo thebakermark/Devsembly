@@ -7,6 +7,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
+from functools import lru_cache
 from typing import Annotated, Protocol
 
 import httpx
@@ -114,6 +115,11 @@ def decode_oidc_token(
     )
 
 
+@lru_cache(maxsize=16)
+def _cached_oidc_verifier(issuer: str, audience: str) -> OidcTokenVerifier:
+    return OidcTokenVerifier(issuer, audience)
+
+
 def get_token_verifier() -> TokenVerifier:
     issuer = os.getenv("DEVSEMBLY_OIDC_ISSUER", "").strip()
     audience = os.getenv("DEVSEMBLY_OIDC_AUDIENCE", "").strip()
@@ -122,7 +128,7 @@ def get_token_verifier() -> TokenVerifier:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"code": "identity_provider_unavailable"},
         )
-    return OidcTokenVerifier(issuer, audience)
+    return _cached_oidc_verifier(issuer, audience)
 
 
 bearer = HTTPBearer(auto_error=False)

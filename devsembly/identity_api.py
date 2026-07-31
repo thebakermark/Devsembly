@@ -95,6 +95,13 @@ async def update_membership(
     principal: AuthorizedPrincipal,
 ) -> MembershipRead:
     async with SessionFactory() as session, session.begin():
+        organization = await session.scalar(
+            select(models.Organization.id)
+            .where(models.Organization.id == organization_id)
+            .with_for_update()
+        )
+        if organization is None:
+            raise _not_found()
         membership = await session.scalar(
             select(models.OrganizationMembership).where(
                 models.OrganizationMembership.id == membership_id,

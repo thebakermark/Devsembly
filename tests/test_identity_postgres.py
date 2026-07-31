@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 from devsembly import models
 from devsembly.api import app
-from devsembly.auth import TokenVerifier, VerifiedIdentity, get_token_verifier
+from devsembly.auth import PrincipalContext, TokenVerifier, VerifiedIdentity, get_token_verifier
 from devsembly.database import SessionFactory
+from devsembly.identity_api import update_membership
+from devsembly.identity_schemas import MembershipUpdate
 
 TEST_DATABASE_URL = os.getenv("DEVSEMBLY_TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(
@@ -163,3 +167,67 @@ async def test_oidc_memberships_delegation_and_audit_are_enforced() -> None:
         serialized = " ".join(str(event.payload) for event in audit_events)
         assert "alice" not in serialized
         assert "bob" not in serialized
+
+
+async def test_concurrent_owner_removal_preserves_one_active_owner() -> None:
+    async with SessionFactory() as session, session.begin():
+        await session.execute(
+            text(
+                "TRUNCATE outbox_events, audit_events, workflow_step_attempts, "
+                "workflow_steps, workflow_runs, decisions, cost_evaluations, "
+                "authorization_delegations, organization_memberships, external_identities, "
+                "principals, budgets, projects, initiatives, organizations CASCADE"
+            )
+        )
+        organization = models.Organization(name="Serialized owners")
+        first_principal = models.Principal(display_name="First Owner")
+        second_principal = models.Principal(display_name="Second Owner")
+        session.add_all([organization, first_principal, second_principal])
+        await session.flush()
+        first_membership = models.OrganizationMembership(
+            organization_id=organization.id,
+            principal_id=first_principal.id,
+            role="owner",
+            status="active",
+        )
+        second_membership = models.OrganizationMembership(
+            organization_id=organization.id,
+            principal_id=second_principal.id,
+            role="owner",
+            status="active",
+        )
+        session.add_all([first_membership, second_membership])
+        await session.flush()
+        organization_id = organization.id
+        membership_ids = (first_membership.id, second_membership.id)
+        principal_id = first_principal.id
+
+    principal = PrincipalContext(
+        principal_id=principal_id,
+        issuer="https://issuer.test",
+        subject="first-owner",
+        display_name="First Owner",
+    )
+    payload = MembershipUpdate(role="viewer", status="active")
+    results = await asyncio.gather(
+        update_membership(organization_id, membership_ids[0], payload, principal),
+        update_membership(organization_id, membership_ids[1], payload, principal),
+        return_exceptions=True,
+    )
+    failures = [result for result in results if isinstance(result, HTTPException)]
+    assert len(failures) == 1
+    assert len([result for result in results if not isinstance(result, BaseException)]) == 1
+    assert failures[0].status_code == 409
+    assert failures[0].detail == {"code": "last_owner_required"}
+
+    async with SessionFactory() as session:
+        owner_count = await session.scalar(
+            select(func.count())
+            .select_from(models.OrganizationMembership)
+            .where(
+                models.OrganizationMembership.organization_id == organization_id,
+                models.OrganizationMembership.role == "owner",
+                models.OrganizationMembership.status == "active",
+            )
+        )
+    assert owner_count == 1

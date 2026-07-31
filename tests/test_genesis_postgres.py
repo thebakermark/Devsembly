@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import uuid
 from datetime import UTC, datetime
@@ -25,6 +26,7 @@ from devsembly.domain import (
     ProjectStateAssertionStatus,
     ProjectStatus,
     WorkflowAttemptStatus,
+    WorkflowRunDetail,
     WorkflowRunStatus,
     WorkflowStepDefinition,
 )
@@ -291,6 +293,56 @@ async def test_project_intelligence_revisions_are_atomic_and_idempotent(
     assert projection is not None and projection.source_revision_id == first.id
     assert work_item_count == 1
     assert alias_count == 1
+
+
+async def test_concurrent_identical_workflow_creates_return_one_run(
+    postgres_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    factory = lambda: SqlAlchemyUnitOfWork(postgres_factory)
+    genesis = GenesisService(factory)
+    organization = await genesis.create_organization("Concurrent workflows")
+    initiative = await genesis.create_initiative(
+        organization.id,
+        name="Genesis",
+        objective="Preserve exact replay under concurrency.",
+        status=InitiativeStatus.ACTIVE,
+    )
+    project = await genesis.create_project(
+        organization.id,
+        initiative.id,
+        name="Control Plane",
+        repository="thebakermark/Devsembly",
+        status=ProjectStatus.ACTIVE,
+    )
+    definitions = (
+        WorkflowStepDefinition(key="build", name="Build"),
+        WorkflowStepDefinition(key="validate", name="Validate"),
+    )
+
+    async def create() -> tuple[WorkflowRunDetail, bool]:
+        return await WorkflowService(factory).create_workflow_run(
+            organization.id,
+            initiative.id,
+            project.id,
+            workflow_kind="software_change",
+            idempotency_key="concurrent-exact-replay",
+            input_payload={"issue_number": 22},
+            steps=definitions,
+        )
+
+    first, second = await asyncio.gather(create(), create())
+    assert first[0].run.id == second[0].run.id
+    assert sorted((first[1], second[1])) == [False, True]
+
+    async with postgres_factory() as session:
+        run_count = await session.scalar(select(func.count()).select_from(models.WorkflowRun))
+        step_count = await session.scalar(select(func.count()).select_from(models.WorkflowStep))
+        event_count = await session.scalar(
+            select(func.count()).where(models.OutboxEvent.topic == "genesis.workflow_run.created")
+        )
+    assert run_count == 1
+    assert step_count == 2
+    assert event_count == 1
 
 
 async def test_workflow_repositories_persist_scope_idempotency_attempts_and_retry(

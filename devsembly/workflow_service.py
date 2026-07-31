@@ -138,7 +138,18 @@ class WorkflowService:
                 for position, definition in enumerate(steps)
             )
 
-            await unit.workflow_runs.add(workflow_run)
+            stored_run = await unit.workflow_runs.add(workflow_run)
+            if stored_run.id != workflow_run.id:
+                detail = await self._detail(unit, stored_run)
+                if self._matches_request(
+                    detail,
+                    workflow_kind=workflow_kind,
+                    input_payload=input_payload,
+                    steps=steps,
+                    retry_of_run_id=None,
+                ):
+                    return detail, False
+                raise IdempotencyConflictError(idempotency_key)
             for workflow_step in workflow_steps:
                 await unit.workflow_steps.add(workflow_step)
             await unit.outbox.add(
@@ -361,7 +372,18 @@ class WorkflowService:
                 )
                 for position, definition in enumerate(source_definitions)
             )
-            await unit.workflow_runs.add(retry_run)
+            stored_retry = await unit.workflow_runs.add(retry_run)
+            if stored_retry.id != retry_run.id:
+                detail = await self._detail(unit, stored_retry)
+                if self._matches_request(
+                    detail,
+                    workflow_kind=source.workflow_kind,
+                    input_payload=source.input_payload,
+                    steps=source_definitions,
+                    retry_of_run_id=source.id,
+                ):
+                    return detail, False
+                raise IdempotencyConflictError(idempotency_key)
             for step in retry_steps:
                 await unit.workflow_steps.add(step)
             await unit.outbox.add(

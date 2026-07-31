@@ -1071,28 +1071,34 @@ class SqlAlchemyWorkflowRunRepository:
         self._session = session
 
     async def add(self, workflow_run: WorkflowRun) -> WorkflowRun:
-        self._session.add(
-            models.WorkflowRun(
-                id=workflow_run.id,
-                project_id=workflow_run.project_id,
-                workflow_kind=workflow_run.workflow_kind,
-                idempotency_key=workflow_run.idempotency_key,
-                input_payload=workflow_run.input_payload,
-                status=workflow_run.status.value,
-                temporal_workflow_id=workflow_run.temporal_workflow_id,
-                retry_of_run_id=workflow_run.retry_of_run_id,
-                cost_estimate=workflow_run.cost_estimate,
-                version=workflow_run.version,
-                cancellation_requested_at=workflow_run.cancellation_requested_at,
-                started_at=workflow_run.started_at,
-                completed_at=workflow_run.completed_at,
-                created_at=workflow_run.created_at,
-                updated_at=workflow_run.updated_at,
-            )
-        )
         try:
-            await self._session.flush()
+            async with self._session.begin_nested():
+                self._session.add(
+                    models.WorkflowRun(
+                        id=workflow_run.id,
+                        project_id=workflow_run.project_id,
+                        workflow_kind=workflow_run.workflow_kind,
+                        idempotency_key=workflow_run.idempotency_key,
+                        input_payload=workflow_run.input_payload,
+                        status=workflow_run.status.value,
+                        temporal_workflow_id=workflow_run.temporal_workflow_id,
+                        retry_of_run_id=workflow_run.retry_of_run_id,
+                        cost_estimate=workflow_run.cost_estimate,
+                        version=workflow_run.version,
+                        cancellation_requested_at=workflow_run.cancellation_requested_at,
+                        started_at=workflow_run.started_at,
+                        completed_at=workflow_run.completed_at,
+                        created_at=workflow_run.created_at,
+                        updated_at=workflow_run.updated_at,
+                    )
+                )
+                await self._session.flush()
         except IntegrityError as exc:
+            existing = await self.get_by_idempotency_key(
+                workflow_run.project_id, workflow_run.idempotency_key
+            )
+            if existing is not None:
+                return existing
             raise DuplicateResourceError("workflow run") from exc
         return workflow_run
 

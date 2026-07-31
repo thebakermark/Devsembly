@@ -7,7 +7,13 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from devsembly.api import app
-from devsembly.auth import ROLE_PERMISSIONS, Permission, decode_oidc_token
+from devsembly.auth import (
+    ROLE_PERMISSIONS,
+    Permission,
+    _cached_oidc_verifier,
+    decode_oidc_token,
+    get_token_verifier,
+)
 
 
 def test_role_permissions_are_least_privilege() -> None:
@@ -67,6 +73,7 @@ def test_oidc_validation_enforces_signature_issuer_audience_and_expiry() -> None
             issuer="https://other.test",
             audience="devsembly",
         )
+
     with pytest.raises(jwt.InvalidAudienceError):
         decode_oidc_token(
             token,
@@ -83,3 +90,18 @@ def test_oidc_validation_enforces_signature_issuer_audience_and_expiry() -> None
             issuer="https://issuer.test",
             audience="devsembly",
         )
+
+
+def test_oidc_verifier_is_reused_for_the_same_provider_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _cached_oidc_verifier.cache_clear()
+    monkeypatch.setenv("DEVSEMBLY_OIDC_ISSUER", "https://issuer.cache.test/")
+    monkeypatch.setenv("DEVSEMBLY_OIDC_AUDIENCE", "devsembly")
+    first = get_token_verifier()
+    second = get_token_verifier()
+    assert first is second
+
+    monkeypatch.setenv("DEVSEMBLY_OIDC_AUDIENCE", "other")
+    assert get_token_verifier() is not first
+    _cached_oidc_verifier.cache_clear()
