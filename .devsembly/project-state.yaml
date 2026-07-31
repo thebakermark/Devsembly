@@ -1,5 +1,5 @@
 schema_version: 1
-updated_at: "2026-07-31T15:10:00Z"
+updated_at: "2026-07-31T15:54:32Z"
 repository: thebakermark/Devsembly
 branch: docs/genesis-reference-implementation-plan
 pull_request:
@@ -27,9 +27,13 @@ completed_capabilities:
   - project-intelligence-architecture
   - project-state-schema
   - immutable-project-state-revisions
+  - pie-work-item-hierarchy
+  - pie-provider-aliases
+  - pie-capability-and-dependency-projections
+  - pie-projection-rebuild
 validation:
-  latest_head: 3554ee9b29d8ce3785c80eef76fcce20bbeac223
-  latest_ci_run: 48
+  latest_head: 0a6705d1c22a394ee60f42d36f249b91e46c9e02
+  latest_ci_run: 50
   status: passed
 open_issues:
   milestone: 32
@@ -42,13 +46,13 @@ open_issues:
     - 29
     - 30
 next_capability:
-  name: pie-work-items-aliases-and-graphs
+  name: pie-github-synchronization-and-conflict-reconciliation
   objectives:
-    - normalize milestones epics features tasks and sprints
-    - add stable external aliases for GitHub and future providers
-    - persist typed capability and dependency graph edges
-    - build revision-derived current-state projections
-    - validate hierarchy and dependency invariants
+    - verify and normalize GitHub webhook deliveries
+    - deduplicate and order provider events
+    - reconcile missed events through authenticated polling
+    - detect authority conflicts and stale provider state
+    - drive durable recovery through Temporal
   required_validation:
     - ruff
     - mypy
