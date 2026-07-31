@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devsembly.dev/schemas/product-definition-1.0.json",
+  "title": "Devsembly Canonical Product Definition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "stable_id",
+    "display_name",
+    "category",
+    "tagline",
+    "general_description",
+    "plain_language_description",
+    "technical_description",
+    "mission",
+    "target_audiences",
+    "design_principles",
+    "names"
+  ],
+  "properties": {
+    "stable_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:[A-Za-z0-9._/-]+$"
+    },
+    "display_name": { "type": "string", "minLength": 1 },
+    "category": { "type": "string", "minLength": 1 },
+    "tagline": { "type": "string", "minLength": 1 },
+    "general_description": { "type": "string", "minLength": 1 },
+    "plain_language_description": { "type": "string", "minLength": 1 },
+    "technical_description": { "type": "string", "minLength": 1 },
+    "mission": { "type": "string", "minLength": 1 },
+    "target_audiences": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "design_principles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "statement"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^principle:[A-Za-z0-9._/-]+$"
+          },
+          "title": { "type": "string", "minLength": 1 },
+          "statement": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "names": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["software_delivery_platform", "reference_runtime", "project_intelligence", "enterprise_platform"],
+      "properties": {
+        "software_delivery_platform": { "$ref": "#/$defs/nameBinding" },
+        "reference_runtime": { "$ref": "#/$defs/nameBinding" },
+        "project_intelligence": { "$ref": "#/$defs/nameBinding" },
+        "enterprise_platform": { "$ref": "#/$defs/nameBinding" }
+      }
+    }
+  },
+  "$defs": {
+    "nameBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stable_id", "display_name", "technical_term"],
+      "properties": {
+        "stable_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*:[A-Za-z0-9._/-]+$"
+        },
+        "display_name": { "type": "string", "minLength": 1 },
+        "technical_term": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
