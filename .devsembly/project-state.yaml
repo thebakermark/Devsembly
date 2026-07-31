@@ -1,5 +1,5 @@
 schema_version: 1
-updated_at: "2026-07-30T18:11:00-05:00"
+updated_at: "2026-07-31T15:10:00Z"
 repository: thebakermark/Devsembly
 branch: docs/genesis-reference-implementation-plan
 pull_request:
@@ -8,7 +8,7 @@ pull_request:
   draft: true
   mergeable: true
   merged: false
-current_milestone: genesis-v0.1
+current_milestone: genesis-pie-foundation
 completed_capabilities:
   - organization-registry
   - initiative-registry
@@ -24,20 +24,31 @@ completed_capabilities:
   - event-publication
   - temporal-dispatch
   - restart-recovery
+  - project-intelligence-architecture
+  - project-state-schema
+  - immutable-project-state-revisions
 validation:
-  latest_head: 15d2a3fa567666e29225c3e947ed0d52f38d40eb
-  latest_ci_run: 46
-  status: passed
+  latest_head: d74e33f
+  latest_ci_run: 47
+  status: local-passed-awaiting-pie-ci
+open_issues:
+  milestone: 32
+  epic: 31
+  implementation:
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
 next_capability:
-  name: workflow-admission-and-cost-escalation
+  name: pie-work-items-aliases-and-graphs
   objectives:
-    - evaluate projected workflow cost before admission
-    - admit workflows allowed by policy and budget
-    - warn when thresholds are approached
-    - pause workflows requiring approval
-    - block workflows that violate policy or budget
-    - resume approved workflows without duplicate execution
-    - audit evaluations approvals denials and overrides
+    - normalize milestones epics features tasks and sprints
+    - add stable external aliases for GitHub and future providers
+    - persist typed capability and dependency graph edges
+    - build revision-derived current-state projections
+    - validate hierarchy and dependency invariants
   required_validation:
     - ruff
     - mypy
@@ -46,16 +57,19 @@ next_capability:
     - docker
     - docker-compose
     - integration-tests
-known_blockers:
-  - current ChatGPT runtime has no local repository checkout
-  - current ChatGPT runtime has no GitHub CLI
-  - current ChatGPT runtime cannot resolve github.com for git clone
+known_blockers: []
 rules:
   keep_pull_request_draft: true
   merge_without_explicit_approval: false
   create_new_branch_without_instruction: false
   source_of_truth: github
 remaining_roadmap:
+  - github-ingestion-reconciliation-and-conflict-queue
+  - validation-risk-and-technical-debt-projections
+  - token-usage-and-ai-cost-ledger
+  - memoryos-agent-context-interface
+  - recommendations-confidence-and-completion-forecasting
+  - executive-dashboard-and-genesis-project-template
   - actual-usage-ingestion-and-adaptive-forecasting
   - end-to-end-governed-50-dollar-monthly-scenario
   - temporal-signals-and-persisted-step-attempts
