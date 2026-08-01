@@ -50,4 +50,4 @@ def test_project_intelligence_schema_and_bootstrap_state() -> None:
     assert len(projection.aliases) == 7
     assert len(projection.graph_nodes) == 4
     assert len(projection.graph_edges) == 2
-    assert len(projection.validation_results) == 8
+    assert len(projection.validation_results) == 9
