@@ -22,11 +22,20 @@ uses argument-vector execution without shell interpretation, enforces normalized
 boundaries, and terminates timed-out or cancelled validation process groups. Non-idempotent delivery
 execution is not automatically retried.
 
-A temporary checkout is filesystem organization, not a security sandbox. Before a credentialed live
-delivery proof, coding and validation must run as a non-root identity inside an ephemeral container or
-microVM with restricted egress, resource limits, a bounded writable filesystem, and no worker control
-plane credentials. Until that boundary is implemented, use only disposable repositories and test
-credentials and treat the external-provider milestone as blocked.
+A temporary checkout is filesystem organization, not a security sandbox. Coding and validation now
+cross the provider-neutral `ExecutionSandbox` boundary. The Docker implementation is ephemeral,
+non-root, read-only-root, capability-free, deny-all-network, and resource bounded; it exposes only the
+task workspace as writable and overlays Git metadata read-only. It receives no worker, source-control,
+database, cloud, OIDC, or control-plane credentials and never falls back to host execution.
+
+The first slice intentionally provides no external model-provider egress. The credentialed live proof
+remains blocked until a controlled development host passes the Docker integration tests and an outer
+gateway supplies narrowly scoped, short-lived task model access with explicit destination policy.
+Unrestricted bridge networking is not an acceptable substitute.
+
+Every sandbox attempt records the image identifier, argument vector, effective limits, non-root user,
+network policy, timestamps, exit, termination reason, and cleanup result. The worker removes labelled
+orphan containers on startup for the single-worker Genesis v0.1 queue.
 
 ## Credential classes
 

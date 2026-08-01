@@ -18,10 +18,12 @@ from devsembly.factory import (
     record_run_memory,
 )
 from devsembly.github_provider import reconcile_github_page
+from devsembly.sandbox import DockerExecutionSandbox
 from devsembly.temporal_workflows import CommittedWorkflow, GitHubSnapshotWorkflow
 
 
 async def main() -> None:
+    await DockerExecutionSandbox().cleanup_stale()
     client = await Client.connect(os.getenv("DEVSEMBLY_TEMPORAL_ADDRESS", "localhost:7233"))
     task_queue = os.getenv("DEVSEMBLY_TEMPORAL_TASK_QUEUE", "devsembly-factory")
     worker = Worker(

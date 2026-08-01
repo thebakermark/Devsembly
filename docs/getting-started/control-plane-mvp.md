@@ -55,6 +55,7 @@ The run is complete only when its traceable issue exists before implementation, 
 
 The source-control provider is idempotent at the work-item boundary by embedding the stable run identifier in the issue. Pull requests remain draft and are never merged by this workflow.
 
-The task-specific checkout does not provide operating-system or network isolation. Complete the
-container or microVM execution boundary described in the trust model before the credentialed
-development-host demonstration. Production deployment and merge remain outside this milestone.
+Coding and validation fail closed through the ephemeral Docker execution boundary described in the
+trust model and ADR-0017. The first slice uses deny-all networking and passes no model credentials, so
+the credentialed development-host demonstration must wait for controlled provider egress and a passing
+Docker integration run on that host. Production deployment and merge remain outside this milestone.

@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-import asyncio
-import contextlib
 import json
-import os
 import shlex
-import signal
 import uuid
 from collections.abc import Callable
 from datetime import timedelta
@@ -31,42 +27,31 @@ from devsembly.domain import (
 )
 from devsembly.memory_service import MemoryContextService
 from devsembly.provider_command import CommandCodingProvider
+from devsembly.sandbox import (
+    DockerExecutionSandbox,
+    ExecutionSandbox,
+    SandboxError,
+    SandboxLimits,
+    SandboxRequest,
+    prepare_workspace_identity,
+)
 from devsembly.source_control import GitHubCliSourceControlProvider
 from devsembly.unit_of_work import SqlAlchemyUnitOfWork
 from devsembly.workflow_service import WorkflowService
 from devsembly.workspace import changed_paths, checkout_task, enforce_allowed_paths
 
-_VALIDATION_ENV_NAMES = {
-    "CI",
-    "HOME",
-    "LANG",
-    "LC_ALL",
-    "PATH",
-    "PYTHONPATH",
-    "SSL_CERT_DIR",
-    "SSL_CERT_FILE",
-    "TMPDIR",
-    "VIRTUAL_ENV",
-}
 _VALIDATION_TIMEOUT_SECONDS = 600.0
 
 
 def _validation_environment() -> dict[str, str]:
     """Return a credential-free environment for untrusted validation commands."""
-    return {name: value for name in _VALIDATION_ENV_NAMES if (value := os.getenv(name)) is not None}
-
-
-async def _terminate_process_group(process: asyncio.subprocess.Process) -> None:
-    if process.returncode is not None:
-        return
-    with contextlib.suppress(ProcessLookupError):
-        os.killpg(process.pid, signal.SIGTERM)
-    try:
-        await asyncio.wait_for(process.wait(), timeout=5)
-    except TimeoutError:
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(process.pid, signal.SIGKILL)
-        await process.wait()
+    return {
+        "CI": "true",
+        "HOME": "/tmp",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+    }
 
 
 @activity.defn
@@ -100,52 +85,30 @@ async def _run_command(
     *,
     timeout_seconds: float = _VALIDATION_TIMEOUT_SECONDS,
     heartbeat: Callable[[str], None] | None = None,
+    sandbox: ExecutionSandbox | None = None,
 ) -> ValidationEvidence:
     arguments = shlex.split(command)
     if not arguments:
         raise ValueError("Validation command must not be empty")
-    process = await asyncio.create_subprocess_exec(
-        *arguments,
-        cwd=cwd,
-        env=_validation_environment(),
-        start_new_session=True,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+    if heartbeat is not None:
+        heartbeat(f"validation:{command[:120]}")
+    runner = sandbox or DockerExecutionSandbox()
+    result = await runner.execute(
+        SandboxRequest(
+            command=arguments,
+            workspace=cwd,
+            environment=_validation_environment(),
+            limits=SandboxLimits(timeout_seconds=timeout_seconds),
+            purpose="validation",
+        )
     )
-    communication = asyncio.create_task(process.communicate())
-    elapsed = 0.0
-    try:
-        while True:
-            try:
-                stdout, stderr = await asyncio.wait_for(
-                    asyncio.shield(communication), timeout=min(10.0, timeout_seconds - elapsed)
-                )
-                break
-            except TimeoutError:
-                elapsed += min(10.0, timeout_seconds - elapsed)
-                if heartbeat is not None:
-                    heartbeat(f"validation:{command[:120]}")
-                if elapsed >= timeout_seconds:
-                    await _terminate_process_group(process)
-                    communication.cancel()
-                    await asyncio.gather(communication, return_exceptions=True)
-                    return ValidationEvidence(
-                        command=command,
-                        exit_code=124,
-                        stderr=f"Validation timed out after {timeout_seconds:g} seconds.",
-                        attempt=attempt,
-                    )
-    except asyncio.CancelledError:
-        await _terminate_process_group(process)
-        communication.cancel()
-        await asyncio.gather(communication, return_exceptions=True)
-        raise
     return ValidationEvidence(
         command=command,
-        exit_code=process.returncode or 0,
-        stdout=stdout.decode(errors="replace")[-20_000:],
-        stderr=stderr.decode(errors="replace")[-20_000:],
+        exit_code=result.metadata.exit_code or 0,
+        stdout=result.stdout.decode(errors="replace"),
+        stderr=result.stderr.decode(errors="replace"),
         attempt=attempt,
+        sandbox_execution=result.metadata,
     )
 
 
@@ -171,6 +134,7 @@ async def execute_autonomous_run(run: FactoryRun) -> FactoryRun:
     coding_provider.heartbeat = activity.heartbeat
     source_control = GitHubCliSourceControlProvider()
     try:
+        prepare_workspace_identity(workspace.root)
         run.work_item_url = await source_control.ensure_work_item(
             task,
             workspace.root,
@@ -183,6 +147,8 @@ async def execute_autonomous_run(run: FactoryRun) -> FactoryRun:
         run.status = RunStatus.BUILDING
         build = await coding_provider.build(task, workspace.root)
         run.summary = build.summary
+        if build.sandbox_execution is not None:
+            run.sandbox_executions.append(build.sandbox_execution)
 
         for attempt in range(task.max_repair_attempts + 1):
             paths = await changed_paths(workspace.root)
@@ -196,6 +162,9 @@ async def execute_autonomous_run(run: FactoryRun) -> FactoryRun:
             run.status = RunStatus.VALIDATING
             evidence = await _validate(task, workspace.root, attempt)
             run.evidence.extend(evidence)
+            run.sandbox_executions.extend(
+                item.sandbox_execution for item in evidence if item.sandbox_execution is not None
+            )
             if all(item.exit_code == 0 for item in evidence):
                 break
             if attempt >= task.max_repair_attempts:
@@ -207,11 +176,20 @@ async def execute_autonomous_run(run: FactoryRun) -> FactoryRun:
             run.repair_attempts += 1
             repair = await coding_provider.repair(task, workspace.root, evidence, attempt + 1)
             run.summary = repair.summary
+            if repair.sandbox_execution is not None:
+                run.sandbox_executions.append(repair.sandbox_execution)
 
         run.status = RunStatus.PUBLISHING
         evidence_summary = "\n".join(
             f"- `{item.command}`: exit {item.exit_code} (attempt {item.attempt})"
             for item in run.evidence
+        )
+        sandbox_summary = "\n".join(
+            "- "
+            f"`{item.execution_id}`: image `{item.image_identifier or item.image}`, "
+            f"network `{item.network_policy}`, user `{item.user}`, exit `{item.exit_code}`, "
+            f"termination `{item.termination_reason}`, cleanup `{item.cleanup_succeeded}`"
+            for item in run.sandbox_executions
         )
         body = (
             "## Devsembly autonomous run\n\n"
@@ -220,6 +198,8 @@ async def execute_autonomous_run(run: FactoryRun) -> FactoryRun:
             f"**Changed paths:** {', '.join(run.changed_paths)}\n\n"
             "## Validation evidence\n\n"
             f"{evidence_summary}\n\n"
+            "## Sandbox evidence\n\n"
+            f"{sandbox_summary}\n\n"
             "This is a draft change request. Human review and approval are required."
         )
         run.change_request_url = await source_control.publish_draft_change_request(
@@ -232,6 +212,8 @@ async def execute_autonomous_run(run: FactoryRun) -> FactoryRun:
         run.summary = "Autonomous coding run completed and published for human review."
         return run
     except Exception as exc:  # noqa: BLE001 - activity must preserve failure context
+        if isinstance(exc, SandboxError):
+            run.sandbox_executions.append(exc.metadata)
         run.status = RunStatus.ESCALATED
         run.summary = f"Autonomous execution failed: {type(exc).__name__}: {exc}"
         return run

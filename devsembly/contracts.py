@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
 from uuid import UUID, uuid4
@@ -69,6 +70,31 @@ class ValidationEvidence(BaseModel):
     stdout: str = ""
     stderr: str = ""
     attempt: int = 0
+    sandbox_execution: SandboxExecutionMetadata | None = None
+
+
+class SandboxExecutionMetadata(BaseModel):
+    execution_id: UUID
+    runtime: str
+    image: str
+    image_identifier: str | None = None
+    command: list[str]
+    purpose: str = "validation"
+    user: str
+    workspace_mode: str = "task-specific-rw"
+    root_filesystem_read_only: bool = True
+    network_policy: str = "deny-all"
+    cpu_limit: float
+    memory_limit_bytes: int
+    pid_limit: int
+    storage_limit_bytes: int
+    output_limit_bytes: int
+    timeout_seconds: float
+    started_at: datetime
+    finished_at: datetime | None = None
+    exit_code: int | None = None
+    termination_reason: str | None = None
+    cleanup_succeeded: bool | None = None
 
 
 class FactoryRun(BaseModel):
@@ -83,3 +109,4 @@ class FactoryRun(BaseModel):
     change_request_url: str | None = None
     memory_proposal_id: UUID | None = None
     summary: str | None = None
+    sandbox_executions: list[SandboxExecutionMetadata] = Field(default_factory=list)

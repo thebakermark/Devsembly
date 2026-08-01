@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import sys
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -12,10 +15,12 @@ from devsembly.contracts import (
     ProductRequest,
     ProjectContext,
     RunStatus,
+    SandboxExecutionMetadata,
     ValidationEvidence,
 )
 from devsembly.factory import create_task_packet, evidence_gate, execute_autonomous_run
 from devsembly.providers import BuildResult
+from devsembly.sandbox import SandboxRequest, SandboxResult
 from devsembly.workflow_dispatcher import TemporalWorkflowStarter
 
 
@@ -35,6 +40,53 @@ def request(*, with_project_context: bool = False) -> ProductRequest:
         validation_commands=["pytest -q"],
         project_context=context,
     )
+
+
+class LocalArgumentVectorSandbox:
+    async def execute(self, request: SandboxRequest) -> SandboxResult:
+        command = (
+            [sys.executable, *request.command[1:]]
+            if request.command[0] == "python"
+            else request.command
+        )
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            cwd=request.workspace,
+            env=request.environment,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        reason = "completed"
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(request.stdin), timeout=request.limits.timeout_seconds
+            )
+            exit_code = process.returncode or 0
+        except TimeoutError:
+            process.kill()
+            await process.wait()
+            stdout, stderr, exit_code, reason = b"", b"timed out", 124, "timeout"
+        now = datetime.now(UTC)
+        metadata = SandboxExecutionMetadata(
+            execution_id=uuid.uuid4(),
+            runtime="test",
+            image="test",
+            command=request.command,
+            user="65532:65532",
+            cpu_limit=request.limits.cpus,
+            memory_limit_bytes=request.limits.memory_bytes,
+            pid_limit=request.limits.pids,
+            storage_limit_bytes=request.limits.storage_bytes,
+            output_limit_bytes=request.limits.output_bytes,
+            timeout_seconds=request.limits.timeout_seconds,
+            started_at=now,
+            finished_at=now,
+            exit_code=exit_code,
+            termination_reason=reason,
+            cleanup_succeeded=True,
+        )
+        return SandboxResult(stdout=stdout, stderr=stderr, metadata=metadata)
 
 
 @pytest.mark.asyncio
@@ -86,6 +138,7 @@ async def test_delivery_loop_creates_work_item_before_build_and_draft_pr(
     monkeypatch.setattr(factory_module, "_validate", validate)
     monkeypatch.setattr(factory_module, "CommandCodingProvider", CodingProvider)
     monkeypatch.setattr(factory_module, "GitHubCliSourceControlProvider", SourceControlProvider)
+    monkeypatch.setattr(factory_module, "prepare_workspace_identity", lambda workspace: None)
 
     run = await create_task_packet(FactoryRun(request=request()))
     run = await execute_autonomous_run(run)
@@ -137,6 +190,7 @@ async def test_validation_command_does_not_invoke_a_shell(tmp_path: Path) -> Non
         'python -c "import sys; sys.exit(7)" && touch should-not-exist',
         tmp_path,
         0,
+        sandbox=LocalArgumentVectorSandbox(),
     )
 
     assert evidence.exit_code != 0
@@ -154,6 +208,7 @@ async def test_validation_command_receives_no_worker_secrets(
         "print(os.getenv('DEVSEMBLY_DATABASE_URL'))\"",
         tmp_path,
         0,
+        sandbox=LocalArgumentVectorSandbox(),
     )
 
     assert evidence.exit_code == 0
@@ -167,6 +222,7 @@ async def test_validation_timeout_terminates_process_group(tmp_path: Path) -> No
         tmp_path,
         0,
         timeout_seconds=0.05,
+        sandbox=LocalArgumentVectorSandbox(),
     )
 
     assert evidence.exit_code == 124

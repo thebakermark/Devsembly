@@ -78,6 +78,8 @@ jobs:
           set -Eeuo pipefail
           trap 'docker compose logs --no-color' ERR
           trap 'docker compose down --volumes --remove-orphans' EXIT
+          docker build --file Dockerfile.sandbox --tag devsembly-sandbox:latest .
+          uv run pytest -q tests/test_sandbox.py
           docker compose build
           docker compose up -d --wait --wait-timeout 240
           curl --fail --silent --show-error http://127.0.0.1:8000/health/ready

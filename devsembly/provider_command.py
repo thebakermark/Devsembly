@@ -1,28 +1,21 @@
 from __future__ import annotations
 
-import asyncio
-import contextlib
 import json
 import os
-import signal
+import shlex
 from collections.abc import Callable
 from pathlib import Path
 
 from devsembly.contracts import TaskPacket, ValidationEvidence
 from devsembly.providers import BuildResult
+from devsembly.sandbox import (
+    DockerExecutionSandbox,
+    ExecutionSandbox,
+    SandboxError,
+    SandboxLimits,
+    SandboxRequest,
+)
 from devsembly.workspace import changed_paths, enforce_allowed_paths
-
-_ALLOWED_ENV = {
-    "ANTHROPIC_API_KEY",
-    "DEVSEMBLY_CLAUDE_MAX_TURNS",
-    "DEVSEMBLY_CLAUDE_MODEL",
-    "HOME",
-    "LANG",
-    "LC_ALL",
-    "PATH",
-    "SSL_CERT_DIR",
-    "SSL_CERT_FILE",
-}
 
 
 class CommandCodingProvider:
@@ -39,14 +32,21 @@ class CommandCodingProvider:
         *,
         heartbeat: Callable[[str], None] | None = None,
         timeout_seconds: float = 1_800,
+        sandbox: ExecutionSandbox | None = None,
     ) -> None:
         self.command = command or os.getenv("DEVSEMBLY_CODING_PROVIDER_COMMAND", "")
         self.heartbeat = heartbeat
         self.timeout_seconds = timeout_seconds
+        self.sandbox = sandbox or DockerExecutionSandbox()
 
     @staticmethod
     def _provider_environment() -> dict[str, str]:
-        return {name: value for name in _ALLOWED_ENV if (value := os.getenv(name)) is not None}
+        return {
+            "HOME": "/tmp",
+            "LANG": "C.UTF-8",
+            "LC_ALL": "C.UTF-8",
+            "PATH": "/usr/local/bin:/usr/bin:/bin:/app/node_modules/.bin",
+        }
 
     async def _execute(
         self,
@@ -56,60 +56,31 @@ class CommandCodingProvider:
     ) -> BuildResult:
         if not self.command:
             raise RuntimeError("DEVSEMBLY_CODING_PROVIDER_COMMAND is not configured")
-        process = await asyncio.create_subprocess_shell(
-            self.command,
-            cwd=workspace,
-            env=self._provider_environment(),
-            start_new_session=True,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        arguments = shlex.split(self.command)
+        if not arguments:
+            raise RuntimeError("DEVSEMBLY_CODING_PROVIDER_COMMAND must be an argument vector")
+        if self.heartbeat is not None:
+            self.heartbeat(f"coding-provider:{payload.get('action', 'unknown')}")
+        result = await self.sandbox.execute(
+            SandboxRequest(
+                command=arguments,
+                workspace=workspace,
+                stdin=json.dumps(payload).encode(),
+                environment=self._provider_environment(),
+                limits=SandboxLimits(timeout_seconds=self.timeout_seconds),
+                purpose="coding",
+            )
         )
-        communication = asyncio.create_task(process.communicate(json.dumps(payload).encode()))
-        elapsed = 0.0
-        try:
-            while True:
-                try:
-                    stdout, stderr = await asyncio.wait_for(
-                        asyncio.shield(communication),
-                        timeout=min(10.0, self.timeout_seconds - elapsed),
-                    )
-                    break
-                except TimeoutError:
-                    elapsed += min(10.0, self.timeout_seconds - elapsed)
-                    if self.heartbeat is not None:
-                        self.heartbeat(f"coding-provider:{payload.get('action', 'unknown')}")
-                    if elapsed >= self.timeout_seconds:
-                        await self._terminate(process)
-                        communication.cancel()
-                        await asyncio.gather(communication, return_exceptions=True)
-                        raise RuntimeError(
-                            f"Coding provider timed out after {self.timeout_seconds:g} seconds"
-                        )
-        except asyncio.CancelledError:
-            await self._terminate(process)
-            communication.cancel()
-            await asyncio.gather(communication, return_exceptions=True)
-            raise
-        if process.returncode != 0:
-            raise RuntimeError(f"Coding provider failed: {stderr.decode(errors='replace')[-4000:]}")
+        if result.metadata.exit_code != 0:
+            raise SandboxError(
+                "Coding provider failed inside sandbox: "
+                f"{result.stderr.decode(errors='replace')[-4000:]}",
+                result.metadata,
+            )
         paths = await changed_paths(workspace)
         enforce_allowed_paths(paths, allowed_paths)
-        summary = stdout.decode(errors="replace").strip()[-4000:] or "Provider completed."
-        return BuildResult(summary=summary, changed_paths=paths)
-
-    @staticmethod
-    async def _terminate(process: asyncio.subprocess.Process) -> None:
-        if process.returncode is not None:
-            return
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(process.pid, signal.SIGTERM)
-        try:
-            await asyncio.wait_for(process.wait(), timeout=5)
-        except TimeoutError:
-            with contextlib.suppress(ProcessLookupError):
-                os.killpg(process.pid, signal.SIGKILL)
-            await process.wait()
+        summary = result.stdout.decode(errors="replace").strip()[-4000:] or "Provider completed."
+        return BuildResult(summary=summary, changed_paths=paths, sandbox_execution=result.metadata)
 
     async def build(self, task: TaskPacket, workspace: Path) -> BuildResult:
         return await self._execute(

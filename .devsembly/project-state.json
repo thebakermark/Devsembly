@@ -376,6 +376,28 @@
     "status": "partial",
     "results": [
       {
+        "id": "validation:issue-33-secure-execution-boundary-local",
+        "title": "Secure execution boundary local gates",
+        "status": "partial",
+        "kind": "security-validation-suite",
+        "evidence_ids": ["evidence:local-issue-33-sandbox"],
+        "acceptance_criterion_ids": ["criterion:issue-33-secure-execution-boundary"],
+        "affected_capability_ids": ["capability:project-intelligence"],
+        "provenance": {
+          "provider": "repository",
+          "kind": "local-validation",
+          "external_id": "issue-33-secure-execution-boundary",
+          "uri": null,
+          "occurred_at": "2026-08-01T16:02:03Z",
+          "observed_at": "2026-08-01T16:02:03Z"
+        },
+        "confidence": {
+          "score": 0.8,
+          "status": "verified",
+          "explanation": "Ruff, formatting, strict MyPy, 73 local tests, canonical repository and product projection validation, 134-file Markdown link validation, 133-file Markdown lint, one Alembic head, offline upgrade SQL through 0015, shell syntax, and diff checks passed. Twenty-two PostgreSQL-only tests and one Docker integration test were skipped because their runtimes are unavailable in the Work environment; CI evidence remains pending."
+        }
+      },
+      {
         "id": "validation:first-governed-delivery-loop-local",
         "title": "Governed delivery loop local gates",
         "status": "passed",
@@ -519,29 +541,56 @@
   "risks": [
     {
       "id": "risk:untrusted-execution-boundary",
-      "title": "Coding and validation are not yet OS-isolated from the worker",
-      "status": "open",
+      "title": "Coding and validation require operational verification of the Docker boundary",
+      "status": "mitigating",
       "kind": "security",
-      "severity": "critical",
+      "severity": "high",
       "owner_id": "service:devsembly-governance",
-      "likelihood": 0.8,
+      "likelihood": 0.3,
       "impact": 1.0,
-      "mitigation": "Run coding and validation in an ephemeral non-root sandbox with restricted egress and no control-plane credentials.",
-      "trigger": "Any credentialed external-provider run before sandbox enforcement.",
+      "mitigation": "The implementation now fails closed through an ephemeral non-root, deny-all-network Docker sandbox with bounded resources and no control-plane credentials; run its integration suite on the controlled development host before live use.",
+      "trigger": "Any credentialed external-provider run before the Docker integration suite passes on the controlled development host.",
       "affected_capability_ids": ["capability:project-intelligence"],
       "affected_dependency_ids": [],
       "provenance": {
         "provider": "repository",
-        "kind": "independent-review-confirmed",
-        "external_id": "execution-boundary-audit-2026-08-01",
+        "kind": "implementation",
+        "external_id": "devsembly/sandbox.py",
         "uri": null,
         "occurred_at": "2026-08-01T00:00:00Z",
-        "observed_at": "2026-08-01T00:00:00Z"
+        "observed_at": "2026-08-01T16:02:03Z"
       },
       "confidence": {
         "score": 1.0,
         "status": "verified",
-        "explanation": "Credential filtering is implemented, but the coding provider still shares the worker filesystem and network namespace."
+        "explanation": "Host fallback has been removed and focused unit tests pass; Docker runtime integration is unavailable in the Work environment and must still be proven on the controlled host."
+      }
+    },
+    {
+      "id": "risk:controlled-model-egress-unavailable",
+      "title": "External coding-provider access has no controlled egress gateway",
+      "status": "open",
+      "kind": "security",
+      "severity": "high",
+      "owner_id": "service:devsembly-governance",
+      "likelihood": 1.0,
+      "impact": 0.8,
+      "mitigation": "Keep coding network deny-all and credential-free until an outer gateway provides destination policy and narrowly scoped short-lived task access.",
+      "trigger": "Attempting the external-provider fixture or substituting unrestricted bridge networking.",
+      "affected_capability_ids": ["capability:project-intelligence"],
+      "affected_dependency_ids": [],
+      "provenance": {
+        "provider": "repository",
+        "kind": "accepted-decision",
+        "external_id": "docs/architecture/decisions/0017-ephemeral-docker-execution-boundary.md",
+        "uri": null,
+        "occurred_at": "2026-08-01T16:02:03Z",
+        "observed_at": "2026-08-01T16:02:03Z"
+      },
+      "confidence": {
+        "score": 1.0,
+        "status": "verified",
+        "explanation": "ADR-0017 intentionally implements deny-all networking first and forbids long-lived model credentials or unrestricted bridge networking."
       }
     },
     {
@@ -650,7 +699,7 @@
   "recommendations": [
     {
       "id": "recommendation:prove-first-governed-delivery-loop",
-      "title": "Complete runtime isolation before the development-host fixture delivery",
+      "title": "Verify the Docker boundary and add controlled model egress before the fixture",
       "status": "active",
       "kind": "next-work",
       "provenance": {
@@ -659,12 +708,12 @@
         "external_id": "33",
         "uri": "https://github.com/thebakermark/Devsembly/issues/33",
         "occurred_at": "2026-07-31T23:42:55Z",
-        "observed_at": "2026-07-31T23:50:00Z"
+        "observed_at": "2026-08-01T16:02:03Z"
       },
       "confidence": {
         "score": 1.0,
         "status": "inferred",
-        "explanation": "Validation secret isolation, path enforcement, bounded subprocesses, and explicit retry policy are implemented; OS-level sandboxing remains required before the credentialed fixture run."
+        "explanation": "The fail-closed Docker boundary and focused unit coverage are implemented. The controlled development host must run the Docker integration suite, and a policy-controlled outer model gateway must exist before the credentialed fixture run."
       }
     }
   ],

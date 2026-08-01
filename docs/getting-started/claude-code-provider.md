@@ -8,20 +8,26 @@ Copy `.env.example` to `.env` and set:
 
 ```bash
 DEVSEMBLY_CODING_PROVIDER_COMMAND=/app/scripts/providers/claude-code.sh
-ANTHROPIC_API_KEY=replace-with-an-anthropic-console-api-key
 DEVSEMBLY_CLAUDE_MODEL=sonnet
 DEVSEMBLY_CLAUDE_MAX_TURNS=20
 DEVSEMBLY_SOURCE_CONTROL_TOKEN=replace-with-a-limited-source-control-token
 ```
 
-Never commit `.env`. The source-control token should be limited to reading the fixture repository, pushing factory branches, and opening draft change requests.
+Never commit `.env`. The source-control token should be limited to reading the fixture repository,
+pushing factory branches, and opening draft change requests. Do not configure a long-lived model key;
+the deny-all first slice cannot pass it into the sandbox.
 
 ## Start or rebuild
 
 ```bash
+docker build --file Dockerfile.sandbox --tag devsembly-sandbox:latest .
 docker compose up -d --build
 bash scripts/devsembly-status.sh
 ```
+
+The controlled worker runtime must have access to a Docker daemon and CLI. Do not mount the Docker
+socket into a task container. The Compose worker does not receive the host socket by default, so it
+fails closed until the development host supplies the approved outer runtime boundary.
 
 ## Provider smoke check
 
@@ -32,16 +38,19 @@ docker compose exec worker claude --version
 docker compose exec worker bash -n /app/scripts/providers/claude-code.sh
 ```
 
-The coding provider receives only an explicit environment allowlist. In particular, `DEVSEMBLY_SOURCE_CONTROL_TOKEN`, database credentials, and unrelated host secrets are not inherited by Claude Code. The control plane uses the source-control token separately to create the traceable issue and publish the draft pull request.
+The coding provider receives only a fixed credential-free environment. In particular,
+`DEVSEMBLY_SOURCE_CONTROL_TOKEN`, database credentials, model keys, and unrelated host secrets are not
+inherited by Claude Code. The control plane uses the source-control token separately to create the
+traceable issue and publish the draft pull request.
 
-## First live run (blocked pending sandboxing)
+## First live run (blocked pending controlled model egress)
 
-Do not start the credentialed live run until coding and validation execute in the ephemeral,
-non-root, network-restricted boundary required by the trust model. Once that control is implemented,
-use a disposable fixture repository before targeting Devsembly. Submit a bounded task with explicit
-allowed paths and validation commands. The expected outcome is a traceable issue, factory branch,
-draft change request, validation evidence, and—when canonical project IDs are supplied—a governed
-MemoryOS proposal. The system does not merge or deploy the result.
+Coding and validation now fail closed through the ephemeral, non-root Docker boundary required by the
+trust model. The first slice intentionally uses `--network none` and provides no model credential, so
+Claude Code cannot call an external model yet. Do not substitute bridge networking or a long-lived API
+key. Run the credentialed fixture only after a controlled outer gateway supplies narrowly scoped,
+short-lived task access and the Docker integration tests pass on the development host. Then use a
+disposable fixture repository before targeting Devsembly.
 
 Recommended first task:
 
@@ -59,8 +68,7 @@ Recommended first task:
 
 ## Safety expectations
 
-Claude Code may read and edit the task-specific checkout and run a small allowlist of development
-commands. It is explicitly denied source-control publication commands and web tools. Those tool
-restrictions do not provide operating-system or network isolation. Devsembly separately enforces
-changed-path boundaries, validation credential filtering, retry limits, and draft-only publication;
-the runtime sandbox remains a prerequisite for live use.
+Claude Code may read and edit only the task-specific checkout and run a small allowlist of development
+commands inside the sandbox. Git metadata is read-only, the Docker socket is absent, network is denied,
+and source-control publication stays in the controlled outer provider. Devsembly separately enforces
+changed-path boundaries, bounded validation and repair, and draft-only publication.

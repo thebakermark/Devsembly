@@ -4,13 +4,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from devsembly.contracts import TaskPacket, ValidationEvidence
+from devsembly.contracts import SandboxExecutionMetadata, TaskPacket, ValidationEvidence
 
 
 @dataclass(frozen=True)
 class BuildResult:
     summary: str
     changed_paths: list[str]
+    sandbox_execution: SandboxExecutionMetadata | None = None
 
 
 class AICodingProvider(Protocol):
