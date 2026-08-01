@@ -70,7 +70,7 @@ async def test_gateway_replaces_task_auth_and_forwards_only_to_fixed_provider() 
                 "anthropic-version": "2023-06-01",
                 "x-untrusted-header": "drop-me",
             },
-            json={"model": "claude-sonnet-fixture", "messages": []},
+            json={"model": "claude-sonnet-fixture", "max_tokens": 1024, "messages": []},
         )
 
     assert response.status_code == 200
@@ -108,4 +108,40 @@ async def test_gateway_rejects_invalid_token_and_disallowed_model_without_egress
 
     assert invalid.status_code == 401
     assert disallowed.status_code == 403
+    assert calls == 0
+
+
+@pytest.mark.asyncio
+async def test_gateway_bounds_requests_and_output_tokens() -> None:
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, json={"content": []})
+
+    def client_factory() -> httpx.AsyncClient:
+        return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+    app = create_model_gateway_app(
+        configuration(max_requests_per_token=1, max_output_tokens_per_request=1024),
+        client_factory=client_factory,
+    )
+    token = ModelGatewayTokenCodec(SECRET).issue("task-123")
+    headers = {"authorization": f"Bearer {token}"}
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://gateway") as client:
+        too_large = await client.post(
+            "/v1/messages",
+            headers=headers,
+            json={"model": "claude-sonnet-fixture", "max_tokens": 1025, "messages": []},
+        )
+        rate_limited = await client.post(
+            "/v1/messages/count_tokens",
+            headers=headers,
+            json={"model": "claude-sonnet-fixture", "messages": []},
+        )
+
+    assert too_large.status_code == 403
+    assert rate_limited.status_code == 429
     assert calls == 0

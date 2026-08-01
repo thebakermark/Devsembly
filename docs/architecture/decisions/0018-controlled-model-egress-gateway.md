@@ -24,7 +24,8 @@ Genesis will use a narrow outer model-egress gateway for the first live fixture.
 - The gateway is the only service on both that internal network and a provider-egress network. It is
   not connected to the control-plane network or its databases.
 - The gateway accepts only Anthropic Messages and token-count requests, only for configured model
-  identifiers, with bounded request, response, and upstream time limits.
+  identifiers, with bounded request count, output tokens, request size, response size, and upstream
+  time.
 - The upstream origin must be HTTPS and its host must appear in the explicit destination allowlist.
 - Caller authorization and arbitrary headers are discarded. The gateway adds the real provider key
   only on the fixed upstream request.
@@ -44,6 +45,8 @@ gateway and is not a provider credential. Source-control publication remains out
   relay can replace this after the live fixture if latency or memory evidence requires it.
 - Multi-worker or concurrent activity execution requires per-task network isolation before the
   concurrency limit is raised.
+- The per-token request counter is process-local in Genesis v0.1. A durable distributed counter is
+  required before the gateway is replicated.
 - Controlled-host configuration, disposable credentials, and the live fixture remain operational
   validation steps; this decision does not authorize production use.
 

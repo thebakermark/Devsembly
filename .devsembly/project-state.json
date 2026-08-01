@@ -394,7 +394,7 @@
         "confidence": {
           "score": 0.8,
           "status": "inferred",
-          "explanation": "Local repository validation passed with 82 tests and 23 runtime-dependent skips, including task-token, fixed-destination gateway, model allowlist, credential isolation, and Docker-internal network policy tests. Docker, Compose, PostgreSQL, and live-stack validation await CI."
+          "explanation": "Local repository validation passed with 83 tests and 23 runtime-dependent skips, including task-token, fixed-destination gateway, request/output bounds, model allowlist, credential isolation, and Docker-internal network policy tests. Docker, Compose, PostgreSQL, and live-stack validation await CI."
         }
       },
       {

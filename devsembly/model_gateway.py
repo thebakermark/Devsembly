@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import hashlib
@@ -101,6 +102,8 @@ class ModelGatewayConfiguration:
     max_request_bytes: int = 2_097_152
     max_response_bytes: int = 33_554_432
     timeout_seconds: float = 600.0
+    max_requests_per_token: int = 64
+    max_output_tokens_per_request: int = 32_768
 
     def __post_init__(self) -> None:
         parsed = urlsplit(self.provider_base_url)
@@ -115,6 +118,10 @@ class ModelGatewayConfiguration:
             raise ValueError("Model provider API key is required")
         if not self.allowed_models:
             raise ValueError("At least one allowed model is required")
+        if not 1 <= self.max_requests_per_token <= 256:
+            raise ValueError("Model request limit must be between 1 and 256")
+        if not 1 <= self.max_output_tokens_per_request <= 65_536:
+            raise ValueError("Model output-token limit must be between 1 and 65536")
 
     @classmethod
     def from_environment(cls) -> ModelGatewayConfiguration:
@@ -150,6 +157,8 @@ def create_model_gateway_app(
     client_factory: ClientFactory | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Devsembly Model Egress Gateway", docs_url=None, redoc_url=None)
+    usage: dict[str, tuple[int, int]] = {}
+    usage_lock = asyncio.Lock()
 
     def config() -> ModelGatewayConfiguration:
         try:
@@ -168,12 +177,21 @@ def create_model_gateway_app(
             raise HTTPException(status_code=404, detail="Unsupported model-provider operation")
         if authorization is None or not authorization.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Missing task token")
+        token = authorization.removeprefix("Bearer ")
         try:
-            ModelGatewayTokenCodec(gateway.signing_secret).verify(
-                authorization.removeprefix("Bearer ")
-            )
+            claims = ModelGatewayTokenCodec(gateway.signing_secret).verify(token)
         except ValueError as exc:
             raise HTTPException(status_code=401, detail="Invalid task token") from exc
+        token_key = hashlib.sha256(token.encode()).hexdigest()
+        observed_at = int(time.time())
+        async with usage_lock:
+            expired = [key for key, (_, expires_at) in usage.items() if expires_at <= observed_at]
+            for key in expired:
+                del usage[key]
+            request_count, _ = usage.get(token_key, (0, claims.expires_at))
+            if request_count >= gateway.max_requests_per_token:
+                raise HTTPException(status_code=429, detail="Task model-request limit reached")
+            usage[token_key] = (request_count + 1, claims.expires_at)
         body = await request.body()
         if len(body) > gateway.max_request_bytes:
             raise HTTPException(status_code=413, detail="Model request exceeds configured limit")
@@ -186,6 +204,16 @@ def create_model_gateway_app(
             ) from exc
         if not isinstance(model, str) or model not in gateway.allowed_models:
             raise HTTPException(status_code=403, detail="Requested model is not allowed")
+        if path == "/v1/messages":
+            max_tokens = payload.get("max_tokens")
+            if (
+                not isinstance(max_tokens, int)
+                or isinstance(max_tokens, bool)
+                or not 1 <= max_tokens <= gateway.max_output_tokens_per_request
+            ):
+                raise HTTPException(
+                    status_code=403, detail="Requested output-token limit is not allowed"
+                )
 
         headers = {
             name: value
