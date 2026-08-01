@@ -202,6 +202,7 @@ def _docker_image_available(image: str) -> bool:
     reason="Docker runtime or local devsembly-sandbox:latest image unavailable",
 )
 async def test_docker_integration_enforces_identity_network_and_cleanup(tmp_path: Path) -> None:
+    tmp_path.chmod(0o777)
     runner = DockerExecutionSandbox(image="devsembly-sandbox:latest")
     request = SandboxRequest(
         command=[
@@ -220,7 +221,7 @@ async def test_docker_integration_enforces_identity_network_and_cleanup(tmp_path
 
     result = await runner.execute(request)
 
-    assert result.metadata.exit_code == 0
+    assert result.metadata.exit_code == 0, result.stderr.decode(errors="replace")
     assert result.stdout.splitlines()[0] == b"65532"
     assert (tmp_path / "writable").read_text() == "ok"
     assert result.metadata.network_policy == "deny-all"
