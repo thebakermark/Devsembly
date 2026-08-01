@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import os
 from collections.abc import Awaitable, Callable
-from typing import cast
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, Response
 from temporalio.client import Client
 
 from devsembly.audit import reset_current_audit_actor, set_current_audit_actor
-from devsembly.contracts import FactoryRun
 from devsembly.cost_api import router as cost_router
 from devsembly.database import check_database
 from devsembly.errors import (
@@ -214,13 +212,3 @@ async def readiness() -> dict[str, str]:
 @app.get("/health")
 async def health() -> dict[str, str]:
     return await readiness()
-
-
-@app.get("/runs/{workflow_id}", response_model=FactoryRun)
-async def get_run(workflow_id: str) -> FactoryRun:
-    client = await temporal_client()
-    handle = client.get_workflow_handle(workflow_id)
-    try:
-        return cast(FactoryRun, await handle.result())
-    except Exception as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc

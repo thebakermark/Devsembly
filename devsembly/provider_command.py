@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
+import signal
+from collections.abc import Callable
 from pathlib import Path
 
 from devsembly.contracts import TaskPacket, ValidationEvidence
@@ -30,8 +33,16 @@ class CommandCodingProvider:
     source-control and infrastructure credentials from reaching the coding provider.
     """
 
-    def __init__(self, command: str | None = None) -> None:
+    def __init__(
+        self,
+        command: str | None = None,
+        *,
+        heartbeat: Callable[[str], None] | None = None,
+        timeout_seconds: float = 1_800,
+    ) -> None:
         self.command = command or os.getenv("DEVSEMBLY_CODING_PROVIDER_COMMAND", "")
+        self.heartbeat = heartbeat
+        self.timeout_seconds = timeout_seconds
 
     @staticmethod
     def _provider_environment() -> dict[str, str]:
@@ -49,17 +60,56 @@ class CommandCodingProvider:
             self.command,
             cwd=workspace,
             env=self._provider_environment(),
+            start_new_session=True,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await process.communicate(json.dumps(payload).encode())
+        communication = asyncio.create_task(process.communicate(json.dumps(payload).encode()))
+        elapsed = 0.0
+        try:
+            while True:
+                try:
+                    stdout, stderr = await asyncio.wait_for(
+                        asyncio.shield(communication),
+                        timeout=min(10.0, self.timeout_seconds - elapsed),
+                    )
+                    break
+                except TimeoutError:
+                    elapsed += min(10.0, self.timeout_seconds - elapsed)
+                    if self.heartbeat is not None:
+                        self.heartbeat(f"coding-provider:{payload.get('action', 'unknown')}")
+                    if elapsed >= self.timeout_seconds:
+                        await self._terminate(process)
+                        communication.cancel()
+                        await asyncio.gather(communication, return_exceptions=True)
+                        raise RuntimeError(
+                            f"Coding provider timed out after {self.timeout_seconds:g} seconds"
+                        )
+        except asyncio.CancelledError:
+            await self._terminate(process)
+            communication.cancel()
+            await asyncio.gather(communication, return_exceptions=True)
+            raise
         if process.returncode != 0:
             raise RuntimeError(f"Coding provider failed: {stderr.decode(errors='replace')[-4000:]}")
         paths = await changed_paths(workspace)
         enforce_allowed_paths(paths, allowed_paths)
         summary = stdout.decode(errors="replace").strip()[-4000:] or "Provider completed."
         return BuildResult(summary=summary, changed_paths=paths)
+
+    @staticmethod
+    async def _terminate(process: asyncio.subprocess.Process) -> None:
+        if process.returncode is not None:
+            return
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGTERM)
+        try:
+            await asyncio.wait_for(process.wait(), timeout=5)
+        except TimeoutError:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(process.pid, signal.SIGKILL)
+            await process.wait()
 
     async def build(self, task: TaskPacket, workspace: Path) -> BuildResult:
         return await self._execute(

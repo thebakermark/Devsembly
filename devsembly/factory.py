@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
+import os
 import shlex
+import signal
 import uuid
+from collections.abc import Callable
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
 from temporalio import activity, workflow
+from temporalio.common import RetryPolicy
 
 from devsembly.contracts import (
     FactoryRun,
@@ -30,6 +35,38 @@ from devsembly.source_control import GitHubCliSourceControlProvider
 from devsembly.unit_of_work import SqlAlchemyUnitOfWork
 from devsembly.workflow_service import WorkflowService
 from devsembly.workspace import changed_paths, checkout_task, enforce_allowed_paths
+
+_VALIDATION_ENV_NAMES = {
+    "CI",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "PATH",
+    "PYTHONPATH",
+    "SSL_CERT_DIR",
+    "SSL_CERT_FILE",
+    "TMPDIR",
+    "VIRTUAL_ENV",
+}
+_VALIDATION_TIMEOUT_SECONDS = 600.0
+
+
+def _validation_environment() -> dict[str, str]:
+    """Return a credential-free environment for untrusted validation commands."""
+    return {name: value for name in _VALIDATION_ENV_NAMES if (value := os.getenv(name)) is not None}
+
+
+async def _terminate_process_group(process: asyncio.subprocess.Process) -> None:
+    if process.returncode is not None:
+        return
+    with contextlib.suppress(ProcessLookupError):
+        os.killpg(process.pid, signal.SIGTERM)
+    try:
+        await asyncio.wait_for(process.wait(), timeout=5)
+    except TimeoutError:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)
+        await process.wait()
 
 
 @activity.defn
@@ -56,17 +93,53 @@ async def create_task_packet(run: FactoryRun) -> FactoryRun:
     return run
 
 
-async def _run_command(command: str, cwd: Path, attempt: int) -> ValidationEvidence:
+async def _run_command(
+    command: str,
+    cwd: Path,
+    attempt: int,
+    *,
+    timeout_seconds: float = _VALIDATION_TIMEOUT_SECONDS,
+    heartbeat: Callable[[str], None] | None = None,
+) -> ValidationEvidence:
     arguments = shlex.split(command)
     if not arguments:
         raise ValueError("Validation command must not be empty")
     process = await asyncio.create_subprocess_exec(
         *arguments,
         cwd=cwd,
+        env=_validation_environment(),
+        start_new_session=True,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    stdout, stderr = await process.communicate()
+    communication = asyncio.create_task(process.communicate())
+    elapsed = 0.0
+    try:
+        while True:
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    asyncio.shield(communication), timeout=min(10.0, timeout_seconds - elapsed)
+                )
+                break
+            except TimeoutError:
+                elapsed += min(10.0, timeout_seconds - elapsed)
+                if heartbeat is not None:
+                    heartbeat(f"validation:{command[:120]}")
+                if elapsed >= timeout_seconds:
+                    await _terminate_process_group(process)
+                    communication.cancel()
+                    await asyncio.gather(communication, return_exceptions=True)
+                    return ValidationEvidence(
+                        command=command,
+                        exit_code=124,
+                        stderr=f"Validation timed out after {timeout_seconds:g} seconds.",
+                        attempt=attempt,
+                    )
+    except asyncio.CancelledError:
+        await _terminate_process_group(process)
+        communication.cancel()
+        await asyncio.gather(communication, return_exceptions=True)
+        raise
     return ValidationEvidence(
         command=command,
         exit_code=process.returncode or 0,
@@ -79,7 +152,7 @@ async def _run_command(command: str, cwd: Path, attempt: int) -> ValidationEvide
 async def _validate(task: TaskPacket, workspace: Path, attempt: int) -> list[ValidationEvidence]:
     evidence: list[ValidationEvidence] = []
     for command in task.validation_commands:
-        result = await _run_command(command, workspace, attempt)
+        result = await _run_command(command, workspace, attempt, heartbeat=activity.heartbeat)
         evidence.append(result)
         if result.exit_code != 0:
             break
@@ -95,6 +168,7 @@ async def execute_autonomous_run(run: FactoryRun) -> FactoryRun:
     run.status = RunStatus.CHECKING_OUT
     workspace = await checkout_task(task)
     coding_provider = CommandCodingProvider()
+    coding_provider.heartbeat = activity.heartbeat
     source_control = GitHubCliSourceControlProvider()
     try:
         run.work_item_url = await source_control.ensure_work_item(
@@ -166,18 +240,24 @@ async def execute_autonomous_run(run: FactoryRun) -> FactoryRun:
 
 
 @activity.defn
-async def independent_review(run: FactoryRun) -> FactoryRun:
+async def evidence_gate(run: FactoryRun) -> FactoryRun:
     failed = [item for item in run.evidence if item.exit_code != 0]
     if run.status == RunStatus.ESCALATED or failed:
         run.status = RunStatus.ESCALATED
         if not run.summary:
-            run.summary = "Independent review rejected the run."
+            run.summary = "Evidence gate rejected the run."
     elif not run.change_request_url:
         run.status = RunStatus.ESCALATED
-        run.summary = "Independent review found no published change request."
+        run.summary = "Evidence gate found no published change request."
     else:
         run.status = RunStatus.COMPLETED
     return run
+
+
+@activity.defn
+async def independent_review(run: FactoryRun) -> FactoryRun:
+    """Compatibility activity for workflow histories created before the gate was renamed."""
+    return await evidence_gate(run)
 
 
 @activity.defn
@@ -319,6 +399,7 @@ class GovernedFactoryWorkflow:
         product_request = ProductRequest.model_validate(payload)
         run = FactoryRun(request=product_request)
         short_timeout = timedelta(minutes=5)
+        no_retry = RetryPolicy(maximum_attempts=1)
         await workflow.execute_activity(
             begin_committed_delivery, request, start_to_close_timeout=short_timeout
         )
@@ -329,9 +410,10 @@ class GovernedFactoryWorkflow:
             execute_autonomous_run,
             run,
             start_to_close_timeout=timedelta(minutes=45),
+            retry_policy=no_retry,
         )
         run = await workflow.execute_activity(
-            independent_review, run, start_to_close_timeout=short_timeout
+            evidence_gate, run, start_to_close_timeout=short_timeout
         )
         run = await workflow.execute_activity(
             record_run_memory, run, start_to_close_timeout=short_timeout
@@ -350,14 +432,18 @@ class FactoryWorkflow:
         run = FactoryRun(request=request)
         planning_timeout = timedelta(minutes=5)
         execution_timeout = timedelta(minutes=45)
+        no_retry = RetryPolicy(maximum_attempts=1)
         run = await workflow.execute_activity(
             create_task_packet, run, start_to_close_timeout=planning_timeout
         )
         run = await workflow.execute_activity(
-            execute_autonomous_run, run, start_to_close_timeout=execution_timeout
+            execute_autonomous_run,
+            run,
+            start_to_close_timeout=execution_timeout,
+            retry_policy=no_retry,
         )
         run = await workflow.execute_activity(
-            independent_review, run, start_to_close_timeout=planning_timeout
+            evidence_gate, run, start_to_close_timeout=planning_timeout
         )
         run = await workflow.execute_activity(
             record_run_memory, run, start_to_close_timeout=planning_timeout

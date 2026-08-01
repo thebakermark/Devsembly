@@ -14,7 +14,7 @@ from devsembly.contracts import (
     RunStatus,
     ValidationEvidence,
 )
-from devsembly.factory import create_task_packet, execute_autonomous_run, independent_review
+from devsembly.factory import create_task_packet, evidence_gate, execute_autonomous_run
 from devsembly.providers import BuildResult
 from devsembly.workflow_dispatcher import TemporalWorkflowStarter
 
@@ -89,7 +89,7 @@ async def test_delivery_loop_creates_work_item_before_build_and_draft_pr(
 
     run = await create_task_packet(FactoryRun(request=request()))
     run = await execute_autonomous_run(run)
-    run = await independent_review(run)
+    run = await evidence_gate(run)
 
     assert events == ["workspace", "issue", "build", "validate", "draft-pr", "cleanup"]
     assert run.status is RunStatus.COMPLETED
@@ -141,6 +141,36 @@ async def test_validation_command_does_not_invoke_a_shell(tmp_path: Path) -> Non
 
     assert evidence.exit_code != 0
     assert not (tmp_path / "should-not-exist").exists()
+
+
+@pytest.mark.asyncio
+async def test_validation_command_receives_no_worker_secrets(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("DEVSEMBLY_SOURCE_CONTROL_TOKEN", "source-control-secret")
+    monkeypatch.setenv("DEVSEMBLY_DATABASE_URL", "postgresql://database-secret")
+    evidence = await factory_module._run_command(
+        "python -c \"import os; print(os.getenv('DEVSEMBLY_SOURCE_CONTROL_TOKEN')); "
+        "print(os.getenv('DEVSEMBLY_DATABASE_URL'))\"",
+        tmp_path,
+        0,
+    )
+
+    assert evidence.exit_code == 0
+    assert evidence.stdout.splitlines() == ["None", "None"]
+
+
+@pytest.mark.asyncio
+async def test_validation_timeout_terminates_process_group(tmp_path: Path) -> None:
+    evidence = await factory_module._run_command(
+        'python -c "import time; time.sleep(10)"',
+        tmp_path,
+        0,
+        timeout_seconds=0.05,
+    )
+
+    assert evidence.exit_code == 124
+    assert "timed out" in evidence.stderr
 
 
 @pytest.mark.asyncio

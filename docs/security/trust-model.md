@@ -14,6 +14,20 @@
 - Reviewed third-party agent skills and plugins
 - Bounded retries with escalation
 
+## Untrusted execution boundary
+
+Agent-produced code and repository validation commands are untrusted input. They must not inherit
+worker credentials. The current worker therefore gives validation a minimal explicit environment,
+uses argument-vector execution without shell interpretation, enforces normalized repository path
+boundaries, and terminates timed-out or cancelled validation process groups. Non-idempotent delivery
+execution is not automatically retried.
+
+A temporary checkout is filesystem organization, not a security sandbox. Before a credentialed live
+delivery proof, coding and validation must run as a non-root identity inside an ephemeral container or
+microVM with restricted egress, resource limits, a bounded writable filesystem, and no worker control
+plane credentials. Until that boundary is implemented, use only disposable repositories and test
+credentials and treat the external-provider milestone as blocked.
+
 ## Credential classes
 
 | Class | Intended access |

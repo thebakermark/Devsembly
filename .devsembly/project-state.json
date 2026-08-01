@@ -373,7 +373,7 @@
     "current_sprint": null
   },
   "validation": {
-    "status": "passed",
+    "status": "partial",
     "results": [
       {
         "id": "validation:first-governed-delivery-loop-local",
@@ -516,8 +516,116 @@
     "actual_cost": 0.0,
     "forecast_cost": 0.0
   },
-  "risks": [],
-  "technical_debt": [],
+  "risks": [
+    {
+      "id": "risk:untrusted-execution-boundary",
+      "title": "Coding and validation are not yet OS-isolated from the worker",
+      "status": "open",
+      "kind": "security",
+      "severity": "critical",
+      "owner_id": "service:devsembly-governance",
+      "likelihood": 0.8,
+      "impact": 1.0,
+      "mitigation": "Run coding and validation in an ephemeral non-root sandbox with restricted egress and no control-plane credentials.",
+      "trigger": "Any credentialed external-provider run before sandbox enforcement.",
+      "affected_capability_ids": ["capability:project-intelligence"],
+      "affected_dependency_ids": [],
+      "provenance": {
+        "provider": "repository",
+        "kind": "independent-review-confirmed",
+        "external_id": "execution-boundary-audit-2026-08-01",
+        "uri": null,
+        "occurred_at": "2026-08-01T00:00:00Z",
+        "observed_at": "2026-08-01T00:00:00Z"
+      },
+      "confidence": {
+        "score": 1.0,
+        "status": "verified",
+        "explanation": "Credential filtering is implemented, but the coding provider still shares the worker filesystem and network namespace."
+      }
+    },
+    {
+      "id": "risk:partial-publish-recovery",
+      "title": "A worker crash can leave a branch pushed without a recorded pull request",
+      "status": "mitigating",
+      "kind": "reliability",
+      "severity": "high",
+      "owner_id": "service:devsembly-governance",
+      "likelihood": 0.4,
+      "impact": 0.8,
+      "mitigation": "Split publish into an idempotent activity that reconciles branch and pull-request state after interruption.",
+      "trigger": "Worker termination after branch push and before pull-request completion is recorded.",
+      "affected_capability_ids": [],
+      "affected_dependency_ids": [],
+      "provenance": {
+        "provider": "repository",
+        "kind": "independent-review-confirmed",
+        "external_id": "temporal-publish-audit-2026-08-01",
+        "uri": null,
+        "occurred_at": "2026-08-01T00:00:00Z",
+        "observed_at": "2026-08-01T00:00:00Z"
+      },
+      "confidence": {
+        "score": 1.0,
+        "status": "verified",
+        "explanation": "Automatic retry is disabled for the monolithic non-idempotent activity, but publish is not yet an independently recoverable activity."
+      }
+    }
+  ],
+  "technical_debt": [
+    {
+      "id": "debt:monolithic-delivery-activity",
+      "title": "Split checkout, coding, validation, and publish into recoverable activities",
+      "status": "open",
+      "kind": "workflow-reliability",
+      "owner_id": "service:devsembly-governance",
+      "principal": 5.0,
+      "interest": 0.8,
+      "impact": "Crash recovery remains coarse and partial publication requires manual reconciliation.",
+      "retirement_criteria": "Checkout, coding, validation, and publishing have independent retry policies and failure-injection coverage.",
+      "affected_capability_ids": [],
+      "affected_dependency_ids": [],
+      "provenance": {
+        "provider": "repository",
+        "kind": "independent-review-confirmed",
+        "external_id": "temporal-activity-audit-2026-08-01",
+        "uri": null,
+        "occurred_at": "2026-08-01T00:00:00Z",
+        "observed_at": "2026-08-01T00:00:00Z"
+      },
+      "confidence": {
+        "score": 1.0,
+        "status": "verified",
+        "explanation": "The bounded activity is safer but still combines operations with different retry and recovery semantics."
+      }
+    },
+    {
+      "id": "debt:independent-reviewer",
+      "title": "Add a separate reviewer identity and blocking severity policy",
+      "status": "open",
+      "kind": "governance",
+      "owner_id": "service:devsembly-governance",
+      "principal": 3.0,
+      "interest": 0.5,
+      "impact": "Completion proves evidence completeness but does not provide a second opinion on correctness or security.",
+      "retirement_criteria": "A separate reviewer identity persists findings and blocks unresolved high-severity results.",
+      "affected_capability_ids": [],
+      "affected_dependency_ids": [],
+      "provenance": {
+        "provider": "repository",
+        "kind": "independent-review-confirmed",
+        "external_id": "review-independence-audit-2026-08-01",
+        "uri": null,
+        "occurred_at": "2026-08-01T00:00:00Z",
+        "observed_at": "2026-08-01T00:00:00Z"
+      },
+      "confidence": {
+        "score": 1.0,
+        "status": "verified",
+        "explanation": "The current deterministic step is now named evidence_gate and does not claim independent review."
+      }
+    }
+  ],
   "memory": [
     {
       "id": "memory:governed-context-builder",
@@ -542,7 +650,7 @@
   "recommendations": [
     {
       "id": "recommendation:prove-first-governed-delivery-loop",
-      "title": "Run the first development-host fixture delivery",
+      "title": "Complete runtime isolation before the development-host fixture delivery",
       "status": "active",
       "kind": "next-work",
       "provenance": {
@@ -554,9 +662,9 @@
         "observed_at": "2026-07-31T23:50:00Z"
       },
       "confidence": {
-        "score": 0.95,
+        "score": 1.0,
         "status": "inferred",
-        "explanation": "The control-plane path is implemented and locally validated; a fixture run is the remaining milestone proof before secondary PIE economics or dashboard work."
+        "explanation": "Validation secret isolation, path enforcement, bounded subprocesses, and explicit retry policy are implemented; OS-level sandboxing remains required before the credentialed fixture run."
       }
     }
   ],

@@ -1,6 +1,6 @@
 # Control-plane MVP
 
-This is the first executable Devsembly delivery loop. It accepts a structured product request, starts a durable Temporal workflow, creates a traceable issue and isolated branch, invokes the configured coding provider, runs deterministic validation and bounded repair, publishes a draft pull request, performs an independent evidence review, and proposes the completed episode to governed project memory.
+This is the first executable Devsembly delivery loop. It accepts a structured product request, starts a durable Temporal workflow, creates a traceable issue and task-specific checkout, invokes the configured coding provider, runs deterministic validation and bounded repair, publishes a draft pull request, applies a deterministic evidence gate, and proposes the completed episode to governed project memory.
 
 ## Start
 
@@ -51,8 +51,10 @@ curl \
 
 ## Completion boundary
 
-The run is complete only when its traceable issue exists before implementation, changes remain within the declared paths, every configured validation command passes, a draft pull request exists, independent review accepts the evidence, and a MemoryOS episodic proposal records the outcome. The canonical organization, initiative, and project IDs come from the governed API path rather than caller-controlled workflow input. The proposal remains governed and does not silently become approved semantic truth.
+The run is complete only when its traceable issue exists before implementation, changes remain within the declared paths, every configured validation command passes, a draft pull request exists, the evidence gate accepts the result, and a MemoryOS episodic proposal records the outcome. This evidence gate verifies deterministic completeness; it is not an independent reviewer. The canonical organization, initiative, and project IDs come from the governed API path rather than caller-controlled workflow input. The proposal remains governed and does not silently become approved semantic truth.
 
 The source-control provider is idempotent at the work-item boundary by embedding the stable run identifier in the issue. Pull requests remain draft and are never merged by this workflow.
 
-Use a disposable fixture repository for the first development-host demonstration. Production deployment and merge remain outside this milestone.
+The task-specific checkout does not provide operating-system or network isolation. Complete the
+container or microVM execution boundary described in the trust model before the credentialed
+development-host demonstration. Production deployment and merge remain outside this milestone.
