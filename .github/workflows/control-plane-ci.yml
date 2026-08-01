@@ -18,6 +18,7 @@ on:
       - "uv.lock"
       - "Dockerfile"
       - "docker-compose.yml"
+      - "docker-compose.commissioning.yml"
       - ".github/workflows/control-plane-ci.yml"
       - ".github/workflows/deploy-control-plane.yml"
   push:
@@ -78,6 +79,7 @@ jobs:
           uv run alembic upgrade head
           uv run alembic check
       - run: docker compose --profile model-egress config --quiet
+      - run: docker compose -f docker-compose.yml -f docker-compose.commissioning.yml --profile model-egress config --quiet
       - name: Build and health-check Docker stack
         run: |
           set -Eeuo pipefail
@@ -86,6 +88,7 @@ jobs:
           docker build --file Dockerfile.sandbox --tag devsembly-sandbox:latest .
           uv run pytest -q tests/test_sandbox.py
           docker compose --profile model-egress build
+          docker compose -f docker-compose.yml -f docker-compose.commissioning.yml --profile model-egress build worker
           docker compose --profile model-egress up -d --wait --wait-timeout 240
           test "$(docker network inspect devsembly-sandbox-egress --format '{{.Internal}}')" = true
           gateway_networks="$(docker inspect "$(docker compose --profile model-egress ps -q model-gateway)" --format '{{json .NetworkSettings.Networks}}')"
@@ -95,4 +98,9 @@ jobs:
       - name: Validate shell syntax
         run: |
           bash -n scripts/devsembly-status.sh
+          bash -n scripts/commission-first-run.sh
+          bash -n scripts/commission-from-macbook.sh
+          bash scripts/commission-first-run.sh --help >/dev/null
+          bash scripts/commission-first-run.sh --preflight
+          bash scripts/commission-from-macbook.sh --help >/dev/null
           bash -n scripts/providers/claude-code.sh

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
@@ -40,7 +41,10 @@ def validate_repository_url(repository_url: str) -> None:
 async def checkout_task(task: TaskPacket) -> Workspace:
     repository_url = str(task.repository_url)
     validate_repository_url(repository_url)
-    temporary = TemporaryDirectory(prefix=f"devsembly-{task.run_id}-")
+    workspace_root = os.getenv("DEVSEMBLY_WORKSPACE_ROOT", "").strip() or None
+    if workspace_root is not None:
+        Path(workspace_root).mkdir(parents=True, exist_ok=True)
+    temporary = TemporaryDirectory(prefix=f"devsembly-{task.run_id}-", dir=workspace_root)
     root = Path(temporary.name) / "repository"
     code, _, stderr = await _run(
         "git",

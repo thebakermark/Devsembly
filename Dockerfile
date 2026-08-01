@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12-slim AS runtime
 
 ARG CLAUDE_CODE_VERSION=2.1.220
 
@@ -25,3 +25,11 @@ COPY tests ./tests
 RUN chmod 0755 /app/scripts/providers/*.sh
 
 CMD ["uvicorn", "devsembly.api:app", "--host", "0.0.0.0", "--port", "8000"]
+
+FROM runtime AS commissioning-worker
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends docker.io \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM runtime AS default

@@ -15,6 +15,15 @@ from devsembly.sandbox import (
 )
 
 
+def test_docker_socket_is_limited_to_commissioning_override() -> None:
+    default_compose = Path("docker-compose.yml").read_text()
+    commissioning_compose = Path("docker-compose.commissioning.yml").read_text()
+
+    assert "/var/run/docker.sock" not in default_compose
+    assert "/var/run/docker.sock:/var/run/docker.sock" in commissioning_compose
+    assert "target: commissioning-worker" in commissioning_compose
+
+
 def test_docker_boundary_is_non_root_deny_all_and_resource_bounded(tmp_path: Path) -> None:
     (tmp_path / ".git").mkdir()
     runner = DockerExecutionSandbox(image="sandbox@sha256:fixture")

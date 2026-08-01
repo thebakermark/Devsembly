@@ -50,7 +50,7 @@ key, database credentials, and unrelated host secrets are not inherited by Claud
 plane uses the source-control token separately to create the traceable issue and publish the draft
 pull request.
 
-## First live run (blocked pending controlled-host commissioning)
+## First live run
 
 Coding and validation fail closed through the ephemeral, non-root Docker boundary required by the
 trust model. Validation uses `--network none`. Coding may use only the Docker-internal gateway network,
@@ -73,6 +73,42 @@ Recommended first task:
   "max_repair_attempts": 2
 }
 ```
+
+The repository provides two commissioning entrypoints:
+
+```bash
+# On a MacBook control console:
+bash scripts/commission-from-macbook.sh <tailscale-host-or-ip> [ssh-user]
+
+# Or directly on the development VM:
+bash scripts/commission-first-run.sh
+```
+
+The MacBook entrypoint finds or recovers the established checkout, refuses to overwrite local
+changes, fast-forwards only the existing PR #17 branch, and starts the VM workflow over SSH. The VM
+entrypoint performs command, Docker, repository, branch, fixture, gateway-network, trusted-worker,
+and API readiness checks before submitting work.
+
+The script asks through masked terminal prompts for a temporary human OIDC access token, a temporary
+GitHub token restricted to the public disposable fixture repository, and a disposable Anthropic API
+key. It also asks for the exact OIDC issuer, API audience, and allowed model identifier. Never paste
+these credentials into chat. The fixture repository must be publicly readable for credential-free
+checkout and permit the temporary GitHub token to create issues, branches, commits, and draft pull
+requests. If the standard `thebakermark/devsembly-factory-fixture` repository does not exist, the
+workflow can create and initialize it as a public disposable repository after an explicit terminal
+confirmation; that one-time path requires a token authorized to create a public repository. A
+narrower repository-only token is preferred after the fixture exists.
+
+Commissioning uses `docker-compose.commissioning.yml` in addition to the default Compose file. Only
+the trusted worker receives the host Docker socket and a host-visible temporary-workspace mount. A
+task sandbox receives neither the socket nor source-control, model-provider, OIDC, database, cloud,
+or control-plane credentials. Normal Compose startup does not apply this commissioning override and
+therefore remains fail-closed.
+
+On success, sanitized evidence is written under `commissioning-evidence/<UTC timestamp>/`. The
+temporary secrets file is removed after the stack stops. Use `--keep-stack` only for controlled
+inspection; it deliberately retains the credential file until the operator stops the stack and
+removes that file.
 
 ## Safety expectations
 

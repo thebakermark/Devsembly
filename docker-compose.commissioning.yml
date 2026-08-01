@@ -1,0 +1,22 @@
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+
+  temporal:
+    ports:
+      - "127.0.0.1:${TEMPORAL_PORT:-7233}:7233"
+
+  worker:
+    build:
+      context: .
+      target: commissioning-worker
+    environment:
+      DEVSEMBLY_WORKSPACE_ROOT: ${DEVSEMBLY_WORKSPACE_ROOT:-/var/lib/devsembly/workspaces}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DEVSEMBLY_WORKSPACE_ROOT:-/var/lib/devsembly/workspaces}:${DEVSEMBLY_WORKSPACE_ROOT:-/var/lib/devsembly/workspaces}

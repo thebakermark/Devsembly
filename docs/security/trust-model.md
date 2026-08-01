@@ -40,6 +40,11 @@ gateway network. Per-task networks are required before multi-worker or concurren
 The live proof remains blocked until this topology is commissioned on the controlled development host
 with approved disposable access.
 
+The commissioning-only Compose override may mount the host Docker socket into the trusted worker so
+it can create sibling task sandboxes. It also mounts a dedicated host workspace at the identical path
+inside the worker so Docker bind mounts resolve to the intended disposable checkout. This exception
+does not apply to normal Compose startup, and the socket is never mounted into a task sandbox.
+
 Every sandbox attempt records the image identifier, argument vector, effective limits, non-root user,
 network policy, timestamps, exit, termination reason, and cleanup result. The worker removes labelled
 orphan containers on startup for the single-worker Genesis v0.1 queue.
