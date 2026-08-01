@@ -154,7 +154,7 @@ class DockerExecutionSandbox:
             "--tmpfs",
             f"/tmp:rw,nosuid,nodev,noexec,size={min(limits.storage_bytes, 268_435_456)}",
             "--mount",
-            f"type=bind,source={workspace},target=/workspace,rw",
+            f"type=bind,source={workspace},target=/workspace",
         ]
         git_metadata = workspace / ".git"
         if git_metadata.exists():
