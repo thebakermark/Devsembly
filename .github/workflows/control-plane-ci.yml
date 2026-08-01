@@ -3,13 +3,22 @@ name: Control Plane CI
 on:
   pull_request:
     paths:
+      - ".devsembly/**"
       - "devsembly/**"
+      - "alembic/**"
+      - "alembic.ini"
       - "tests/**"
       - "scripts/**"
+      - "docs/**"
+      - "wiki/**"
+      - "**/*.md"
+      - ".markdownlint-cli2.jsonc"
       - ".env.example"
       - "pyproject.toml"
+      - "uv.lock"
       - "Dockerfile"
       - "docker-compose.yml"
+      - "docker-compose.commissioning.yml"
       - ".github/workflows/control-plane-ci.yml"
       - ".github/workflows/deploy-control-plane.yml"
   push:
@@ -21,19 +30,77 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: devsembly
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: devsembly
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U devsembly -d devsembly"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     env:
       POSTGRES_PASSWORD: ci-only-password
+      MINIO_ROOT_PASSWORD: ci-only-password
+      DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://devsembly:ci-only-password@localhost:5432/devsembly
+      DEVSEMBLY_TEST_DATABASE_URL: postgresql+asyncpg://devsembly:ci-only-password@localhost:5432/devsembly
+      DEVSEMBLY_MODEL_GATEWAY_URL: http://model-gateway:8080
+      DEVSEMBLY_SANDBOX_NETWORK: devsembly-sandbox-egress
+      DEVSEMBLY_MODEL_GATEWAY_SECRET: ci-only-model-gateway-signing-secret
+      DEVSEMBLY_MODEL_PROVIDER_API_KEY: ci-only-provider-key
+      DEVSEMBLY_MODEL_GATEWAY_ALLOWED_MODELS: claude-sonnet-fixture
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
-      - run: uv sync --extra dev
-      - run: uv run ruff check devsembly tests
+      - run: uv sync --locked --extra dev
+      - name: Validate canonical state package
+        run: uv run python scripts/validate_repo.py
+      - run: uv run ruff check devsembly tests scripts/*.py
+      - run: uv run ruff format --check devsembly tests scripts/*.py
       - run: uv run mypy devsembly
+      - name: Validate Markdown
+        run: |
+          npx --yes markdownlint-cli2@0.19.0 '**/*.md'
+          python3 scripts/check_markdown_links.py
+      - name: Upgrade database
+        run: uv run alembic upgrade head
       - run: uv run pytest -q
-      - run: docker compose config --quiet
+      - name: Validate migration round trip and model parity
+        run: |
+          test "$(uv run alembic heads | wc -l)" -eq 1
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+          uv run alembic check
+      - run: docker compose --profile model-egress config --quiet
+      - run: docker compose -f docker-compose.yml -f docker-compose.commissioning.yml --profile model-egress config --quiet
+      - name: Build and health-check Docker stack
+        run: |
+          set -Eeuo pipefail
+          trap 'docker compose --profile model-egress logs --no-color' ERR
+          trap 'docker compose --profile model-egress down --volumes --remove-orphans' EXIT
+          docker build --file Dockerfile.sandbox --tag devsembly-sandbox:latest .
+          uv run pytest -q tests/test_sandbox.py
+          docker compose --profile model-egress build
+          docker compose -f docker-compose.yml -f docker-compose.commissioning.yml --profile model-egress build worker
+          docker compose --profile model-egress up -d --wait --wait-timeout 240
+          test "$(docker network inspect devsembly-sandbox-egress --format '{{.Internal}}')" = true
+          gateway_networks="$(docker inspect "$(docker compose --profile model-egress ps -q model-gateway)" --format '{{json .NetworkSettings.Networks}}')"
+          [[ "$gateway_networks" != *control-plane* ]]
+          curl --fail --silent --show-error http://127.0.0.1:8000/health/ready
+          docker compose ps
       - name: Validate shell syntax
         run: |
           bash -n scripts/devsembly-status.sh
+          bash -n scripts/commission-first-run.sh
+          bash -n scripts/commission-from-macbook.sh
+          bash scripts/commission-first-run.sh --help >/dev/null
+          bash scripts/commission-first-run.sh --preflight
+          bash scripts/commission-from-macbook.sh --help >/dev/null
           bash -n scripts/providers/claude-code.sh

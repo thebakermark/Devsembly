@@ -1,0 +1,81 @@
+schema_version: 1
+updated_at: "2026-07-31T16:12:32Z"
+repository: thebakermark/Devsembly
+branch: docs/genesis-reference-implementation-plan
+pull_request:
+  number: 17
+  state: open
+  draft: true
+  mergeable: true
+  merged: false
+current_milestone: genesis-pie-foundation
+completed_capabilities:
+  - organization-registry
+  - initiative-registry
+  - project-registry
+  - repository-pattern
+  - unit-of-work
+  - budget-engine
+  - cost-governance
+  - identity-and-authorization
+  - evidence-lifecycle
+  - audit-trail
+  - transactional-outbox
+  - event-publication
+  - temporal-dispatch
+  - restart-recovery
+  - project-intelligence-architecture
+  - project-state-schema
+  - immutable-project-state-revisions
+  - pie-work-item-hierarchy
+  - pie-provider-aliases
+  - pie-capability-and-dependency-projections
+  - pie-projection-rebuild
+validation:
+  latest_head: 873903d30c2e3f0e9c5b9401fdf14e68c33129df
+  latest_ci_run: 53
+  status: passed
+open_issues:
+  milestone: 32
+  epic: 31
+  implementation:
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+next_capability:
+  name: pie-github-synchronization-and-conflict-reconciliation
+  objectives:
+    - verify and normalize GitHub webhook deliveries
+    - deduplicate and order provider events
+    - reconcile missed events through authenticated polling
+    - detect authority conflicts and stale provider state
+    - drive durable recovery through Temporal
+  required_validation:
+    - ruff
+    - mypy
+    - pytest
+    - alembic
+    - docker
+    - docker-compose
+    - integration-tests
+known_blockers: []
+rules:
+  keep_pull_request_draft: true
+  merge_without_explicit_approval: false
+  create_new_branch_without_instruction: false
+  source_of_truth: github
+remaining_roadmap:
+  - github-ingestion-reconciliation-and-conflict-queue
+  - validation-risk-and-technical-debt-projections
+  - token-usage-and-ai-cost-ledger
+  - memoryos-agent-context-interface
+  - recommendations-confidence-and-completion-forecasting
+  - executive-dashboard-and-genesis-project-template
+  - actual-usage-ingestion-and-adaptive-forecasting
+  - end-to-end-governed-50-dollar-monthly-scenario
+  - temporal-signals-and-persisted-step-attempts
+  - cancellation-provider-execution-and-evidence
+  - operator-control-surface

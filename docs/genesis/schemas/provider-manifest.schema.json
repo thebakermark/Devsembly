@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devsembly.example/schemas/provider-manifest/0.1.0",
+  "title": "Devsembly Provider Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "provider_id",
+    "adapter_id",
+    "adapter_version",
+    "status",
+    "capabilities",
+    "configuration_schema",
+    "authentication",
+    "health",
+    "lifecycle",
+    "events",
+    "timeouts",
+    "idempotency",
+    "observability",
+    "permissions",
+    "conformance",
+    "replacement_guide"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/semanticVersion"
+    },
+    "provider_id": {
+      "$ref": "#/$defs/stableId"
+    },
+    "adapter_id": {
+      "$ref": "#/$defs/stableId"
+    },
+    "adapter_version": {
+      "$ref": "#/$defs/semanticVersion"
+    },
+    "status": {
+      "enum": [
+        "experimental",
+        "candidate",
+        "supported",
+        "deprecated",
+        "unsupported"
+      ]
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "operations"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/stableId"
+          },
+          "version": {
+            "$ref": "#/$defs/semanticVersion"
+          },
+          "operations": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/stableId"
+            }
+          }
+        }
+      }
+    },
+    "configuration_schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authentication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "methods",
+        "secret_references_only"
+      ],
+      "properties": {
+        "methods": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/stableId"
+          }
+        },
+        "secret_references_only": {
+          "const": true
+        }
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "liveness",
+        "readiness",
+        "functional_probe"
+      ],
+      "properties": {
+        "liveness": {
+          "type": "boolean"
+        },
+        "readiness": {
+          "type": "boolean"
+        },
+        "functional_probe": {
+          "$ref": "#/$defs/stableId"
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supports_drain",
+        "supports_upgrade_rollback"
+      ],
+      "properties": {
+        "supports_drain": {
+          "type": "boolean"
+        },
+        "supports_upgrade_rollback": {
+          "type": "boolean"
+        }
+      }
+    },
+    "events": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inbound",
+        "delivery"
+      ],
+      "properties": {
+        "inbound": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/stableId"
+          }
+        },
+        "delivery": {
+          "enum": [
+            "at-most-once",
+            "at-least-once"
+          ]
+        }
+      }
+    },
+    "timeouts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default_seconds",
+        "maximum_seconds"
+      ],
+      "properties": {
+        "default_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximum_seconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "idempotency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mutations"
+      ],
+      "properties": {
+        "mutations": {
+          "enum": [
+            "provider-key",
+            "adapter-key",
+            "provider-or-adapter-key",
+            "reconciliation-required",
+            "non-idempotent"
+          ]
+        }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "traces",
+        "usage",
+        "cost",
+        "redaction"
+      ],
+      "properties": {
+        "traces": {
+          "type": "boolean"
+        },
+        "usage": {
+          "type": "boolean"
+        },
+        "cost": {
+          "type": "boolean"
+        },
+        "redaction": {
+          "const": "required"
+        }
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9.-]*:(read|write|admin)$"
+      }
+    },
+    "conformance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suite_version",
+        "evidence"
+      ],
+      "properties": {
+        "suite_version": {
+          "$ref": "#/$defs/semanticVersion"
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "replacement_guide": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "semanticVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$"
+    },
+    "stableId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.-]*$"
+    }
+  }
+}

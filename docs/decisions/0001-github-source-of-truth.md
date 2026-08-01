@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR 0012 — GitHub Is a Provider](../architecture/decisions/0012-github-is-a-provider.md).
 
 ## Decision
 

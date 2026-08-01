@@ -1,0 +1,772 @@
+{
+  "schema_version": "1.0",
+  "project": {
+    "id": "project:devsembly",
+    "name": "Devsembly Genesis",
+    "repository": "thebakermark/Devsembly",
+    "status": "active"
+  },
+  "vision": {
+    "text": "Build a governed AI Work Operating System that supplies CompanyOS projects with durable, auditable execution and shared intelligence.",
+    "provenance": {
+      "provider": "repository",
+      "kind": "genesis-constitution",
+      "external_id": "docs/genesis/book-1-constitution/README.md",
+      "uri": null,
+      "occurred_at": null,
+      "observed_at": "2026-07-31T00:00:00Z"
+    },
+    "confidence": {
+      "score": 1.0,
+      "status": "verified",
+      "explanation": "The repository's accepted Genesis Constitution is authoritative."
+    }
+  },
+  "requirements": [],
+  "architecture": {
+    "summary": {
+      "text": "Python and FastAPI modular monolith with PostgreSQL, Temporal, MinIO, Redis, external OIDC, transactional outbox, audit, evidence, and policy-governed workflows.",
+      "provenance": {
+        "provider": "repository",
+        "kind": "accepted-architecture",
+        "external_id": "docs/architecture/system-architecture.md",
+        "uri": null,
+        "occurred_at": null,
+        "observed_at": "2026-07-31T00:00:00Z"
+      },
+      "confidence": {
+        "score": 1.0,
+        "status": "verified",
+        "explanation": "The architecture document and accepted ADRs agree."
+      }
+    },
+    "decisions": [],
+    "components": []
+  },
+  "graphs": {
+    "capabilities": {
+      "nodes": [
+        {
+          "id": "capability:project-intelligence",
+          "kind": "capability",
+          "title": "Project Intelligence Engine",
+          "status": "active",
+          "provenance": {
+            "provider": "repository",
+            "kind": "accepted-architecture",
+            "external_id": "docs/architecture/project-intelligence-engine.md",
+            "uri": null,
+            "occurred_at": null,
+            "observed_at": "2026-07-31T16:00:00Z"
+          },
+          "confidence": {
+            "score": 1.0,
+            "status": "verified",
+            "explanation": "PIE is an accepted Genesis capability implemented in draft PR #17."
+          }
+        },
+        {
+          "id": "component:pie-projection",
+          "kind": "component",
+          "title": "PIE relational projection",
+          "status": "active",
+          "provenance": {
+            "provider": "repository",
+            "kind": "implementation",
+            "external_id": "alembic/versions/0011_project_intelligence_projections.py",
+            "uri": null,
+            "occurred_at": null,
+            "observed_at": "2026-07-31T16:00:00Z"
+          },
+          "confidence": {
+            "score": 1.0,
+            "status": "verified",
+            "explanation": "Migration, models, services, APIs, and tests implement the projection."
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge:pie-implements-projection",
+          "from": "capability:project-intelligence",
+          "to": "component:pie-projection",
+          "type": "implements",
+          "provenance": {
+            "provider": "repository",
+            "kind": "implementation",
+            "external_id": "devsembly/pie_projection.py",
+            "uri": null,
+            "occurred_at": null,
+            "observed_at": "2026-07-31T16:00:00Z"
+          },
+          "confidence": {
+            "score": 1.0,
+            "status": "verified",
+            "explanation": "The projection builder derives normalized read models from PIE revisions."
+          }
+        }
+      ]
+    },
+    "dependencies": {
+      "nodes": [
+        {
+          "id": "component:pie-revision-log",
+          "kind": "component",
+          "title": "PIE immutable revision log",
+          "status": "active",
+          "provenance": {
+            "provider": "repository",
+            "kind": "implementation",
+            "external_id": "alembic/versions/0010_project_intelligence_state.py",
+            "uri": null,
+            "occurred_at": null,
+            "observed_at": "2026-07-31T16:00:00Z"
+          },
+          "confidence": {
+            "score": 1.0,
+            "status": "verified",
+            "explanation": "The immutable revision log is the canonical PIE write model."
+          }
+        },
+        {
+          "id": "component:pie-projection",
+          "kind": "component",
+          "title": "PIE relational projection",
+          "status": "active",
+          "provenance": {
+            "provider": "repository",
+            "kind": "implementation",
+            "external_id": "alembic/versions/0011_project_intelligence_projections.py",
+            "uri": null,
+            "occurred_at": null,
+            "observed_at": "2026-07-31T16:00:00Z"
+          },
+          "confidence": {
+            "score": 1.0,
+            "status": "verified",
+            "explanation": "The projection is rebuilt from an immutable source revision."
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge:projection-depends-on-revisions",
+          "from": "component:pie-projection",
+          "to": "component:pie-revision-log",
+          "type": "depends_on",
+          "provenance": {
+            "provider": "repository",
+            "kind": "accepted-decision",
+            "external_id": "docs/architecture/decisions/0015-project-intelligence-rebuildable-projections.md",
+            "uri": null,
+            "occurred_at": null,
+            "observed_at": "2026-07-31T16:00:00Z"
+          },
+          "confidence": {
+            "score": 1.0,
+            "status": "verified",
+            "explanation": "ADR-0015 requires projections to derive from canonical revisions."
+          }
+        }
+      ]
+    }
+  },
+  "planning": {
+    "roadmap": [],
+    "milestones": [
+      {
+        "id": "milestone:genesis-pie-foundation",
+        "title": "Genesis PIE Foundation",
+        "status": "active",
+        "provenance": {
+          "provider": "github",
+          "kind": "milestone-tracking-issue",
+          "external_id": "32",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/32",
+          "occurred_at": "2026-07-31T15:08:07Z",
+          "observed_at": "2026-07-31T16:00:00Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Authenticated GitHub issue #32 represents the milestone."
+        },
+        "aliases": [
+          {
+            "provider": "github",
+            "account": "thebakermark/Devsembly",
+            "kind": "issue",
+            "external_id": "32",
+            "uri": "https://github.com/thebakermark/Devsembly/issues/32"
+          }
+        ]
+      },
+      {
+        "id": "milestone:first-governed-delivery-loop",
+        "title": "First governed autonomous delivery loop",
+        "status": "active",
+        "provenance": {
+          "provider": "github",
+          "kind": "milestone-tracking-issue",
+          "external_id": "33",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/33",
+          "occurred_at": "2026-07-31T23:42:55Z",
+          "observed_at": "2026-07-31T23:42:55Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Issue #33 records the agreed shortest-path milestone and its live demonstration exit criteria."
+        },
+        "aliases": [
+          {
+            "provider": "github",
+            "account": "thebakermark/Devsembly",
+            "kind": "issue",
+            "external_id": "33",
+            "uri": "https://github.com/thebakermark/Devsembly/issues/33"
+          }
+        ]
+      }
+    ],
+    "epics": [
+      {
+        "id": "epic:project-intelligence",
+        "title": "Project Intelligence Engine",
+        "status": "active",
+        "parent_id": "milestone:genesis-pie-foundation",
+        "provenance": {
+          "provider": "github",
+          "kind": "epic-issue",
+          "external_id": "31",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/31",
+          "occurred_at": "2026-07-31T15:07:57Z",
+          "observed_at": "2026-07-31T16:00:00Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Authenticated GitHub issue #31 is the PIE epic."
+        },
+        "aliases": [
+          {
+            "provider": "github",
+            "account": "thebakermark/Devsembly",
+            "kind": "issue",
+            "external_id": "31",
+            "uri": "https://github.com/thebakermark/Devsembly/issues/31"
+          }
+        ]
+      }
+    ],
+    "features": [],
+    "tasks": [
+      {
+        "id": "task:pie-25",
+        "title": "Canonical work items, provider aliases, and graph projections",
+        "status": "completed",
+        "parent_id": "epic:project-intelligence",
+        "provenance": {
+          "provider": "github",
+          "kind": "implementation-issue",
+          "external_id": "25",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/25",
+          "occurred_at": "2026-07-31T15:07:36Z",
+          "observed_at": "2026-07-31T16:00:00Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "The implementation and local validation satisfy issue #25 acceptance criteria."
+        },
+        "aliases": [
+          {
+            "provider": "github",
+            "account": "thebakermark/Devsembly",
+            "kind": "issue",
+            "external_id": "25",
+            "uri": "https://github.com/thebakermark/Devsembly/issues/25"
+          }
+        ]
+      },
+      {
+        "id": "task:pie-26",
+        "title": "GitHub event synchronization and conflict reconciliation",
+        "status": "completed",
+        "parent_id": "epic:project-intelligence",
+        "provenance": {
+          "provider": "github",
+          "kind": "implementation-issue",
+          "external_id": "26",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/26",
+          "occurred_at": "2026-07-31T15:07:37Z",
+          "observed_at": "2026-07-31T21:00:00Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Issue #26 is complete: webhook ingestion, restart-safe snapshot repair, authenticated GitHub pagination, durable Temporal scheduling, governed conflict resolution, and full Control Plane CI #58 passed."
+        },
+        "aliases": [
+          {
+            "provider": "github",
+            "account": "thebakermark/Devsembly",
+            "kind": "issue",
+            "external_id": "26",
+            "uri": "https://github.com/thebakermark/Devsembly/issues/26"
+          }
+        ]
+      },
+      {
+        "id": "task:pie-27",
+        "title": "Validation, risk register, and technical-debt projections",
+        "status": "completed",
+        "parent_id": "epic:project-intelligence",
+        "provenance": {
+          "provider": "github",
+          "kind": "implementation-issue",
+          "external_id": "27",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/27",
+          "occurred_at": "2026-07-31T15:07:38Z",
+          "observed_at": "2026-07-31T22:00:00Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Issue #27 is complete: validation-status, risk-register, and technical-debt projections are implemented, and full Control Plane CI #60 passed."
+        },
+        "aliases": [{
+          "provider": "github",
+          "account": "thebakermark/Devsembly",
+          "kind": "issue",
+          "external_id": "27",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/27"
+        }]
+      },
+      {
+        "id": "task:pie-29",
+        "title": "Governed MemoryOS project context",
+        "status": "completed",
+        "parent_id": "epic:project-intelligence",
+        "provenance": {
+          "provider": "github",
+          "kind": "implementation-issue",
+          "external_id": "29",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/29",
+          "occurred_at": "2026-07-31T15:07:40Z",
+          "observed_at": "2026-07-31T23:00:00Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Issue #29 is complete: typed memory proposals, approval, deterministic context assembly, retention and sensitivity filters, invalidation, persistence, and full Control Plane CI #63 passed."
+        },
+        "aliases": [{
+          "provider": "github",
+          "account": "thebakermark/Devsembly",
+          "kind": "issue",
+          "external_id": "29",
+          "uri": "https://github.com/thebakermark/Devsembly/issues/29"
+        }]
+      }
+    ],
+    "current_sprint": null
+  },
+  "validation": {
+    "status": "partial",
+    "results": [
+      {
+        "id": "validation:issue-33-commissioning-automation",
+        "title": "Development-host commissioning automation gates",
+        "status": "passed",
+        "kind": "operational-validation-suite",
+        "evidence_ids": ["evidence:ci-88"],
+        "acceptance_criterion_ids": ["criterion:issue-33-secure-execution-boundary"],
+        "affected_capability_ids": ["capability:project-intelligence"],
+        "provenance": {
+          "provider": "github",
+          "kind": "github-actions-run",
+          "external_id": "30723535687",
+          "uri": "https://github.com/thebakermark/Devsembly/actions/runs/30723535687",
+          "occurred_at": "2026-08-01T23:36:25Z",
+          "observed_at": "2026-08-01T23:36:25Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Control Plane CI #88 passed canonical-state validation, Ruff, formatting, strict MyPy, Markdown, 107 PostgreSQL-backed tests with one runtime skip, migration round trip and model parity, normal and commissioning Compose configuration, 13 focused Docker sandbox tests, the commissioning-worker image build, full-stack health, shell syntax, and cleanup. The controlled development host and live provider call remain unverified."
+        }
+      },
+      {
+        "id": "validation:issue-33-controlled-model-egress",
+        "title": "Controlled model-egress gateway gates",
+        "status": "passed",
+        "kind": "security-validation-suite",
+        "evidence_ids": ["evidence:ci-86"],
+        "acceptance_criterion_ids": ["criterion:issue-33-secure-execution-boundary"],
+        "affected_capability_ids": ["capability:project-intelligence"],
+        "provenance": {
+          "provider": "github",
+          "kind": "github-actions-run",
+          "external_id": "30711501140",
+          "uri": "https://github.com/thebakermark/Devsembly/actions/runs/30711501140",
+          "occurred_at": "2026-08-01T18:04:53Z",
+          "observed_at": "2026-08-01T18:04:53Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Local repository validation passed with 83 tests and 23 runtime-dependent skips. Control Plane CI #86 then passed canonical-state validation, Ruff, formatting, strict MyPy, Markdown, 105 tests with PostgreSQL, migration round trip and model parity, model-egress Compose configuration, Docker image builds, live-stack health, internal-network inspection, gateway control-plane isolation, shell syntax, and cleanup."
+        }
+      },
+      {
+        "id": "validation:issue-33-secure-execution-boundary-local",
+        "title": "Secure execution boundary local gates",
+        "status": "passed",
+        "kind": "security-validation-suite",
+        "evidence_ids": ["evidence:ci-82"],
+        "acceptance_criterion_ids": ["criterion:issue-33-secure-execution-boundary"],
+        "affected_capability_ids": ["capability:project-intelligence"],
+        "provenance": {
+          "provider": "github",
+          "kind": "github-actions-run",
+          "external_id": "30707986703",
+          "uri": "https://github.com/thebakermark/Devsembly/actions/runs/30707986703",
+          "occurred_at": "2026-08-01T16:26:13Z",
+          "observed_at": "2026-08-01T16:26:13Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Local gates passed with 73 tests and 23 runtime-dependent skips. Control Plane CI #82 then passed the complete gate: 95 tests with PostgreSQL, migration round trip and model parity, sandbox and stack image builds, nine focused Docker sandbox tests with no skips, Compose startup, live health, shell syntax, and cleanup."
+        }
+      },
+      {
+        "id": "validation:first-governed-delivery-loop-local",
+        "title": "Governed delivery loop local gates",
+        "status": "passed",
+        "kind": "validation-suite",
+        "evidence_ids": ["evidence:ci-74"],
+        "acceptance_criterion_ids": ["criterion:issue-33-control-plane-slice"],
+        "affected_capability_ids": ["capability:project-intelligence"],
+        "provenance": {
+          "provider": "repository",
+          "kind": "local-validation",
+          "external_id": "issue-33-control-plane-slice",
+          "uri": null,
+          "occurred_at": "2026-07-31T23:50:00Z",
+          "observed_at": "2026-07-31T23:50:00Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Control Plane CI #74 passed canonical-state validation, Ruff, format, strict MyPy, Markdown, PostgreSQL tests, migration round-trip and model parity, Docker/Compose builds, and live-stack health. A live external-provider fixture run remains the milestone proof."
+        }
+      },
+      {
+        "id": "validation:memory-context-local",
+        "title": "Memory and Context API local gates",
+        "status": "passed",
+        "kind": "validation-suite",
+        "evidence_ids": ["evidence:ci-63"],
+        "acceptance_criterion_ids": ["criterion:issue-29"],
+        "affected_capability_ids": ["capability:project-intelligence"],
+        "provenance": {
+          "provider": "repository",
+          "kind": "local-validation",
+          "external_id": "issue-29-memory-context",
+          "uri": null,
+          "occurred_at": "2026-07-31T23:00:00Z",
+          "observed_at": "2026-07-31T23:00:00Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Control Plane CI #63 passed locked Ruff, formatting, strict MyPy, Markdown, PostgreSQL migrations, the full test suite, migration round-trip and model parity, Docker/Compose builds, and live-stack health."
+        }
+      },
+      {
+        "id": "validation:pie-assurance-projections",
+        "title": "PIE assurance projection local gates",
+        "status": "passed",
+        "kind": "validation-suite",
+        "evidence_ids": ["evidence:ci-60"],
+        "acceptance_criterion_ids": ["criterion:issue-27"],
+        "affected_capability_ids": ["capability:project-intelligence"],
+        "provenance": {
+          "provider": "repository",
+          "kind": "local-validation",
+          "external_id": "issue-27-assurance-projections",
+          "uri": null,
+          "occurred_at": "2026-07-31T22:00:00Z",
+          "observed_at": "2026-07-31T22:00:00Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Local gates passed and Control Plane CI #60 verified PostgreSQL tests, migration round-trip and model parity, Docker/Compose builds, and live-stack health."
+        }
+      },
+      {
+        "id": "validation:github-conflict-resolution",
+        "title": "GitHub governed conflict resolution local gates",
+        "status": "passed",
+        "kind": "validation-suite",
+        "evidence_ids": ["evidence:ci-58"],
+        "acceptance_criterion_ids": ["criterion:issue-26-conflict-resolution"],
+        "affected_capability_ids": ["capability:project-intelligence"],
+        "provenance": {
+          "provider": "repository",
+          "kind": "local-validation",
+          "external_id": "issue-26-conflict-resolution",
+          "uri": null,
+          "occurred_at": "2026-07-31T21:00:00Z",
+            "observed_at": "2026-07-31T21:00:00Z"
+          },
+          "confidence": {
+            "score": 1.0,
+            "status": "verified",
+            "explanation": "Local gates passed and Control Plane CI #58 verified PostgreSQL tests, migration round-trip and model parity, Docker/Compose builds, and live-stack health."
+          }
+        },
+      {
+        "id": "validation:github-snapshot-reconciliation",
+        "title": "GitHub snapshot reconciliation local gates",
+        "status": "passed",
+        "kind": "validation-suite",
+        "evidence_ids": ["evidence:local-issue-26-snapshot"],
+        "acceptance_criterion_ids": ["criterion:issue-26-snapshot-reconciliation"],
+        "affected_capability_ids": ["capability:project-intelligence"],
+        "provenance": {
+          "provider": "repository",
+          "kind": "local-validation",
+          "external_id": "issue-26-snapshot-reconciliation",
+          "uri": null,
+          "occurred_at": "2026-07-31T18:00:00Z",
+          "observed_at": "2026-07-31T18:00:00Z"
+        },
+        "confidence": {
+          "score": 0.8,
+          "status": "verified",
+          "explanation": "Ruff, format, strict MyPy, 46 local tests, repository validation, and Alembic offline upgrade passed; PostgreSQL-only tests await CI."
+        }
+      },
+      {
+        "id": "validation:github-provider-scheduling",
+        "title": "GitHub provider retrieval and Temporal scheduling local gates",
+        "status": "passed",
+        "kind": "validation-suite",
+        "evidence_ids": ["evidence:local-issue-26-provider"],
+        "acceptance_criterion_ids": ["criterion:issue-26-provider-scheduling"],
+        "affected_capability_ids": ["capability:project-intelligence"],
+        "provenance": {
+          "provider": "repository",
+          "kind": "local-validation",
+          "external_id": "issue-26-provider-scheduling",
+          "uri": null,
+          "occurred_at": "2026-07-31T19:00:00Z",
+          "observed_at": "2026-07-31T19:00:00Z"
+        },
+        "confidence": {
+          "score": 0.8,
+          "status": "verified",
+          "explanation": "Ruff, format, strict MyPy, 50 local tests, Temporal sandbox loading, Alembic offline upgrade, and diff checks passed; PostgreSQL, Docker, Compose, and live-stack gates await CI."
+        }
+      }
+    ]
+  },
+  "economics": {
+    "currency": "USD",
+    "monthly_budget": 50.0,
+    "token_usage": 0,
+    "actual_cost": 0.0,
+    "forecast_cost": 0.0
+  },
+  "risks": [
+    {
+      "id": "risk:untrusted-execution-boundary",
+      "title": "Coding and validation sandbox requires controlled-host commissioning",
+      "status": "mitigating",
+      "kind": "security",
+      "severity": "medium",
+      "owner_id": "service:devsembly-governance",
+      "likelihood": 0.2,
+      "impact": 1.0,
+      "mitigation": "The implementation fails closed through an ephemeral non-root, deny-all-network Docker sandbox with bounded resources and no control-plane credentials; CI #88 passed the commissioning-only trusted-worker image and Compose boundary. Run the automated workflow on the controlled development host before live use.",
+      "trigger": "Any credentialed external-provider run before controlled-host sandbox commissioning.",
+      "affected_capability_ids": ["capability:project-intelligence"],
+      "affected_dependency_ids": [],
+      "provenance": {
+        "provider": "repository",
+        "kind": "implementation",
+        "external_id": "devsembly/sandbox.py",
+        "uri": null,
+        "occurred_at": "2026-08-01T00:00:00Z",
+        "observed_at": "2026-08-01T23:36:25Z"
+      },
+      "confidence": {
+        "score": 1.0,
+        "status": "verified",
+        "explanation": "Host fallback has been removed, and Control Plane CI #88 passed the commissioning override, trusted-worker build, and 13 focused Docker sandbox tests. The controlled development host has not yet run this workflow."
+      }
+    },
+    {
+      "id": "risk:controlled-model-egress-unavailable",
+      "title": "Controlled model egress requires development-host commissioning",
+      "status": "mitigating",
+      "kind": "security",
+      "severity": "high",
+      "owner_id": "service:devsembly-governance",
+      "likelihood": 0.2,
+      "impact": 0.8,
+      "mitigation": "The optional gateway fixes the HTTPS provider destination, operations, and model allowlist; retains the provider key outside the task; and issues five-minute task tokens over a verified Docker-internal network. CI #88 passed the automated commissioning topology. Keep the feature disabled until the controlled-host run passes.",
+      "trigger": "Attempting the external-provider fixture before controlled-host commissioning or substituting unrestricted bridge networking.",
+      "affected_capability_ids": ["capability:project-intelligence"],
+      "affected_dependency_ids": [],
+      "provenance": {
+        "provider": "repository",
+        "kind": "implementation",
+        "external_id": "devsembly/model_gateway.py",
+        "uri": null,
+        "occurred_at": "2026-08-01T17:47:49Z",
+        "observed_at": "2026-08-01T23:36:25Z"
+      },
+      "confidence": {
+        "score": 1.0,
+        "status": "verified",
+        "explanation": "ADR-0018, focused tests, and Control Plane CI #88 verify the narrow gateway and commissioning topology. Live provider behavior still requires controlled-host evidence."
+      }
+    },
+    {
+      "id": "risk:partial-publish-recovery",
+      "title": "A worker crash can leave a branch pushed without a recorded pull request",
+      "status": "mitigating",
+      "kind": "reliability",
+      "severity": "high",
+      "owner_id": "service:devsembly-governance",
+      "likelihood": 0.4,
+      "impact": 0.8,
+      "mitigation": "Split publish into an idempotent activity that reconciles branch and pull-request state after interruption.",
+      "trigger": "Worker termination after branch push and before pull-request completion is recorded.",
+      "affected_capability_ids": [],
+      "affected_dependency_ids": [],
+      "provenance": {
+        "provider": "repository",
+        "kind": "independent-review-confirmed",
+        "external_id": "temporal-publish-audit-2026-08-01",
+        "uri": null,
+        "occurred_at": "2026-08-01T00:00:00Z",
+        "observed_at": "2026-08-01T00:00:00Z"
+      },
+      "confidence": {
+        "score": 1.0,
+        "status": "verified",
+        "explanation": "Automatic retry is disabled for the monolithic non-idempotent activity, but publish is not yet an independently recoverable activity."
+      }
+    }
+  ],
+  "technical_debt": [
+    {
+      "id": "debt:monolithic-delivery-activity",
+      "title": "Split checkout, coding, validation, and publish into recoverable activities",
+      "status": "open",
+      "kind": "workflow-reliability",
+      "owner_id": "service:devsembly-governance",
+      "principal": 5.0,
+      "interest": 0.8,
+      "impact": "Crash recovery remains coarse and partial publication requires manual reconciliation.",
+      "retirement_criteria": "Checkout, coding, validation, and publishing have independent retry policies and failure-injection coverage.",
+      "affected_capability_ids": [],
+      "affected_dependency_ids": [],
+      "provenance": {
+        "provider": "repository",
+        "kind": "independent-review-confirmed",
+        "external_id": "temporal-activity-audit-2026-08-01",
+        "uri": null,
+        "occurred_at": "2026-08-01T00:00:00Z",
+        "observed_at": "2026-08-01T00:00:00Z"
+      },
+      "confidence": {
+        "score": 1.0,
+        "status": "verified",
+        "explanation": "The bounded activity is safer but still combines operations with different retry and recovery semantics."
+      }
+    },
+    {
+      "id": "debt:independent-reviewer",
+      "title": "Add a separate reviewer identity and blocking severity policy",
+      "status": "open",
+      "kind": "governance",
+      "owner_id": "service:devsembly-governance",
+      "principal": 3.0,
+      "interest": 0.5,
+      "impact": "Completion proves evidence completeness but does not provide a second opinion on correctness or security.",
+      "retirement_criteria": "A separate reviewer identity persists findings and blocks unresolved high-severity results.",
+      "affected_capability_ids": [],
+      "affected_dependency_ids": [],
+      "provenance": {
+        "provider": "repository",
+        "kind": "independent-review-confirmed",
+        "external_id": "review-independence-audit-2026-08-01",
+        "uri": null,
+        "occurred_at": "2026-08-01T00:00:00Z",
+        "observed_at": "2026-08-01T00:00:00Z"
+      },
+      "confidence": {
+        "score": 1.0,
+        "status": "verified",
+        "explanation": "The current deterministic step is now named evidence_gate and does not claim independent review."
+      }
+    }
+  ],
+  "memory": [
+    {
+      "id": "memory:governed-context-builder",
+      "title": "Governed Context Builder implementation",
+      "status": "active",
+      "kind": "procedural",
+      "provenance": {
+        "provider": "repository",
+        "kind": "implementation",
+        "external_id": "devsembly/memory_service.py",
+        "uri": null,
+        "occurred_at": null,
+        "observed_at": "2026-07-31T23:00:00Z"
+      },
+      "confidence": {
+        "score": 1.0,
+        "status": "verified",
+        "explanation": "The implementation and full Control Plane CI #63 pass."
+      }
+    }
+  ],
+  "recommendations": [
+    {
+      "id": "recommendation:prove-first-governed-delivery-loop",
+      "title": "Commission the controlled host and run the disposable fixture",
+      "status": "active",
+      "kind": "next-work",
+      "provenance": {
+        "provider": "github",
+        "kind": "milestone-tracking-issue",
+        "external_id": "33",
+        "uri": "https://github.com/thebakermark/Devsembly/issues/33",
+        "occurred_at": "2026-07-31T23:42:55Z",
+        "observed_at": "2026-08-01T23:36:25Z"
+      },
+      "confidence": {
+        "score": 1.0,
+        "status": "inferred",
+        "explanation": "The MacBook-to-development-VM automation passed Control Plane CI #88, including the commissioning-only trusted-worker build and Docker boundary. Run it on the controlled host with approved temporary access to satisfy the remaining live-fixture criterion."
+      }
+    }
+  ],
+  "forecast": {
+    "completion": null,
+    "confidence": {
+      "score": 0.0,
+      "status": "inferred",
+      "explanation": "No calibrated delivery history is available for a completion forecast."
+    }
+  }
+}

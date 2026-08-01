@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
 from urllib.parse import urlparse
 
@@ -40,7 +41,10 @@ def validate_repository_url(repository_url: str) -> None:
 async def checkout_task(task: TaskPacket) -> Workspace:
     repository_url = str(task.repository_url)
     validate_repository_url(repository_url)
-    temporary = TemporaryDirectory(prefix=f"devsembly-{task.run_id}-")
+    workspace_root = os.getenv("DEVSEMBLY_WORKSPACE_ROOT", "").strip() or None
+    if workspace_root is not None:
+        Path(workspace_root).mkdir(parents=True, exist_ok=True)
+    temporary = TemporaryDirectory(prefix=f"devsembly-{task.run_id}-", dir=workspace_root)
     root = Path(temporary.name) / "repository"
     code, _, stderr = await _run(
         "git",
@@ -63,13 +67,54 @@ async def checkout_task(task: TaskPacket) -> Workspace:
 
 
 async def changed_paths(root: Path) -> list[str]:
-    code, stdout, stderr = await _run("git", "status", "--porcelain", cwd=root)
+    code, stdout, stderr = await _run(
+        "git", "status", "--porcelain=v2", "-z", "--untracked-files=all", cwd=root
+    )
     if code != 0:
         raise RuntimeError(f"Unable to inspect workspace: {stderr[-2000:]}")
-    return [line[3:].strip() for line in stdout.splitlines() if len(line) > 3]
+    records = stdout.split("\0")
+    paths: list[str] = []
+    index = 0
+    while index < len(records):
+        record = records[index]
+        index += 1
+        if not record:
+            continue
+        kind = record[0]
+        if kind == "1":
+            fields = record.split(" ", 8)
+            if len(fields) != 9:
+                raise RuntimeError("Unable to parse ordinary git status record")
+            paths.append(fields[8])
+        elif kind == "2":
+            fields = record.split(" ", 9)
+            if len(fields) != 10 or index >= len(records):
+                raise RuntimeError("Unable to parse renamed git status record")
+            paths.append(fields[9])
+            index += 1  # porcelain v2 emits the original path as a separate NUL record
+        elif kind in {"?", "!"}:
+            paths.append(record[2:])
+        elif kind == "u":
+            fields = record.split(" ", 10)
+            if len(fields) != 11:
+                raise RuntimeError("Unable to parse unmerged git status record")
+            paths.append(fields[10])
+        else:
+            raise RuntimeError(f"Unsupported git status record type: {kind!r}")
+    return paths
 
 
 def enforce_allowed_paths(paths: list[str], allowed_paths: list[str]) -> None:
-    disallowed = [path for path in paths if not any(path.startswith(prefix) for prefix in allowed_paths)]
+    boundaries = [PurePosixPath(prefix) for prefix in allowed_paths]
+    disallowed: list[str] = []
+    for path in paths:
+        candidate = PurePosixPath(path)
+        if candidate.is_absolute() or ".." in candidate.parts:
+            disallowed.append(path)
+            continue
+        if not any(
+            candidate == boundary or candidate.is_relative_to(boundary) for boundary in boundaries
+        ):
+            disallowed.append(path)
     if disallowed:
         raise PermissionError(f"Provider changed paths outside the task boundary: {disallowed}")

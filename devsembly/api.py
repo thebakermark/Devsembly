@@ -1,17 +1,166 @@
 from __future__ import annotations
 
 import os
-from typing import cast
-from uuid import uuid4
+from collections.abc import Awaitable, Callable
 
-import asyncpg  # type: ignore[import-untyped]
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.responses import JSONResponse, Response
 from temporalio.client import Client
 
-from devsembly.contracts import FactoryRun, ProductRequest
-from devsembly.factory import FactoryWorkflow
+from devsembly.audit import reset_current_audit_actor, set_current_audit_actor
+from devsembly.cost_api import router as cost_router
+from devsembly.database import check_database
+from devsembly.errors import (
+    CostGovernanceError,
+    DuplicateResourceError,
+    EvidenceIntegrityError,
+    IdempotencyConflictError,
+    InvalidTransitionError,
+    ProjectStateValidationError,
+    ResourceNotFoundError,
+    StaleVersionError,
+)
+from devsembly.evidence_api import router as evidence_router
+from devsembly.genesis_api import router as genesis_router
+from devsembly.github_sync_api import conflict_router as github_conflict_router
+from devsembly.github_sync_api import router as github_sync_router
+from devsembly.identity_api import organization_router as identity_organization_router
+from devsembly.identity_api import router as identity_router
+from devsembly.memory_api import router as memory_router
+from devsembly.outbox_publisher import worker_readiness
+from devsembly.pie_api import router as pie_router
+from devsembly.workflow_api import internal_router as workflow_internal_router
+from devsembly.workflow_api import router as workflow_router
+from devsembly.workflow_dispatcher import WORKER_NAME as DISPATCHER_WORKER_NAME
 
 app = FastAPI(title="Devsembly Factory API", version="0.1.0")
+app.include_router(genesis_router)
+app.include_router(workflow_router)
+app.include_router(workflow_internal_router)
+app.include_router(cost_router)
+app.include_router(identity_router)
+app.include_router(identity_organization_router)
+app.include_router(evidence_router)
+app.include_router(pie_router)
+app.include_router(memory_router)
+app.include_router(github_sync_router)
+app.include_router(github_conflict_router)
+
+
+@app.middleware("http")
+async def audit_actor_scope(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    token = set_current_audit_actor("service", "genesis-control-plane")
+    try:
+        return await call_next(request)
+    finally:
+        reset_current_audit_actor(token)
+
+
+@app.exception_handler(ResourceNotFoundError)
+async def resource_not_found(request: Request, exc: ResourceNotFoundError) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={
+            "code": "resource_not_found",
+            "detail": str(exc),
+            "resource": exc.resource,
+        },
+    )
+
+
+@app.exception_handler(DuplicateResourceError)
+async def duplicate_resource(request: Request, exc: DuplicateResourceError) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={
+            "code": "duplicate_resource",
+            "detail": str(exc),
+            "resource": exc.resource,
+        },
+    )
+
+
+@app.exception_handler(StaleVersionError)
+async def stale_version(request: Request, exc: StaleVersionError) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={
+            "code": "stale_version",
+            "detail": str(exc),
+            "resource": exc.resource,
+            "expected_version": exc.expected_version,
+        },
+    )
+
+
+@app.exception_handler(IdempotencyConflictError)
+async def idempotency_conflict(request: Request, exc: IdempotencyConflictError) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={
+            "code": "idempotency_conflict",
+            "detail": str(exc),
+            "idempotency_key": exc.idempotency_key,
+        },
+    )
+
+
+@app.exception_handler(InvalidTransitionError)
+async def invalid_transition(request: Request, exc: InvalidTransitionError) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={
+            "code": "invalid_transition",
+            "detail": str(exc),
+            "resource": exc.resource,
+            "current_status": exc.current_status,
+            "target_status": exc.target_status,
+        },
+    )
+
+
+@app.exception_handler(CostGovernanceError)
+async def cost_governance_error(request: Request, exc: CostGovernanceError) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        content={
+            "code": "cost_governance_error",
+            "detail": str(exc),
+        },
+    )
+
+
+@app.exception_handler(EvidenceIntegrityError)
+async def evidence_integrity_error(request: Request, exc: EvidenceIntegrityError) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        content={
+            "code": "evidence_integrity_error",
+            "detail": str(exc),
+            "evidence_id": exc.evidence_id,
+        },
+    )
+
+
+@app.exception_handler(ProjectStateValidationError)
+async def project_state_validation_error(
+    request: Request, exc: ProjectStateValidationError
+) -> JSONResponse:
+    del request
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        content={"code": "project_state_validation_error", "detail": exc.detail},
+    )
 
 
 async def temporal_client() -> Client:
@@ -31,25 +180,28 @@ async def readiness() -> dict[str, str]:
     try:
         await temporal_client()
         checks["temporal"] = "ok"
-    except Exception as exc:  # noqa: BLE001 - readiness must report any dependency failure
+    except Exception as exc:  # noqa: BLE001 - readiness reports dependency failures
         checks["temporal"] = f"unavailable: {type(exc).__name__}"
 
-    database_url = os.getenv("DEVSEMBLY_DATABASE_URL")
-    if not database_url:
-        checks["postgres"] = "unconfigured"
-    else:
-        connection: asyncpg.Connection | None = None
-        try:
-            connection = await asyncpg.connect(
-                database_url.replace("postgresql+asyncpg://", "postgresql://")
-            )
-            await connection.execute("SELECT 1")
-            checks["postgres"] = "ok"
-        except Exception as exc:  # noqa: BLE001 - readiness must report any dependency failure
-            checks["postgres"] = f"unavailable: {type(exc).__name__}"
-        finally:
-            if connection is not None:
-                await connection.close()
+    try:
+        await check_database()
+        checks["postgres"] = "ok"
+    except Exception as exc:  # noqa: BLE001 - readiness reports dependency failures
+        checks["postgres"] = f"unavailable: {type(exc).__name__}"
+
+    try:
+        outbox_status = await worker_readiness()
+        checks["outbox_publisher"] = "ok" if outbox_status["ready"] is True else "unavailable"
+    except Exception as exc:  # noqa: BLE001 - readiness reports dependency failures
+        checks["outbox_publisher"] = f"unavailable: {type(exc).__name__}"
+
+    try:
+        dispatcher_status = await worker_readiness(worker_name=DISPATCHER_WORKER_NAME)
+        checks["temporal_dispatcher"] = (
+            "ok" if dispatcher_status["ready"] is True else "unavailable"
+        )
+    except Exception as exc:  # noqa: BLE001 - readiness reports dependency failures
+        checks["temporal_dispatcher"] = f"unavailable: {type(exc).__name__}"
 
     if any(value != "ok" for value in checks.values()):
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=checks)
@@ -60,26 +212,3 @@ async def readiness() -> dict[str, str]:
 @app.get("/health")
 async def health() -> dict[str, str]:
     return await readiness()
-
-
-@app.post("/runs", response_model=dict[str, str], status_code=202)
-async def start_run(request: ProductRequest) -> dict[str, str]:
-    client = await temporal_client()
-    workflow_id = f"factory-{uuid4()}"
-    await client.start_workflow(
-        FactoryWorkflow.run,
-        request,
-        id=workflow_id,
-        task_queue="devsembly-factory",
-    )
-    return {"workflow_id": workflow_id, "status": "queued"}
-
-
-@app.get("/runs/{workflow_id}", response_model=FactoryRun)
-async def get_run(workflow_id: str) -> FactoryRun:
-    client = await temporal_client()
-    handle = client.get_workflow_handle(workflow_id)
-    try:
-        return cast(FactoryRun, await handle.result())
-    except Exception as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc

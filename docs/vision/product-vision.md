@@ -24,5 +24,5 @@ A user can describe an outcome in plain English and Devsembly will transform it 
 - Claiming that agents literally replace human expertise
 - Allowing autonomous production changes without explicit policy
 - Embedding Devsembly agents inside products built by the platform
-- Replacing GitHub as the authoritative source of truth
+- Replacing the source-control provider as authority for repository and delivery evidence
 - Giving agents unrestricted access to production systems

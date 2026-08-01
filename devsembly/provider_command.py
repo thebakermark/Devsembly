@@ -1,25 +1,22 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import os
+import shlex
+from collections.abc import Callable
 from pathlib import Path
 
 from devsembly.contracts import TaskPacket, ValidationEvidence
+from devsembly.model_gateway import ModelGatewayTokenCodec
 from devsembly.providers import BuildResult
+from devsembly.sandbox import (
+    DockerExecutionSandbox,
+    ExecutionSandbox,
+    SandboxError,
+    SandboxLimits,
+    SandboxRequest,
+)
 from devsembly.workspace import changed_paths, enforce_allowed_paths
-
-_ALLOWED_ENV = {
-    "ANTHROPIC_API_KEY",
-    "DEVSEMBLY_CLAUDE_MAX_TURNS",
-    "DEVSEMBLY_CLAUDE_MODEL",
-    "HOME",
-    "LANG",
-    "LC_ALL",
-    "PATH",
-    "SSL_CERT_DIR",
-    "SSL_CERT_FILE",
-}
 
 
 class CommandCodingProvider:
@@ -30,36 +27,83 @@ class CommandCodingProvider:
     source-control and infrastructure credentials from reaching the coding provider.
     """
 
-    def __init__(self, command: str | None = None) -> None:
+    def __init__(
+        self,
+        command: str | None = None,
+        *,
+        heartbeat: Callable[[str], None] | None = None,
+        timeout_seconds: float = 1_800,
+        sandbox: ExecutionSandbox | None = None,
+    ) -> None:
         self.command = command or os.getenv("DEVSEMBLY_CODING_PROVIDER_COMMAND", "")
+        self.heartbeat = heartbeat
+        self.timeout_seconds = timeout_seconds
+        self.sandbox = sandbox or DockerExecutionSandbox()
 
     @staticmethod
-    def _provider_environment() -> dict[str, str]:
-        return {name: value for name in _ALLOWED_ENV if (value := os.getenv(name)) is not None}
+    def _provider_environment(task: TaskPacket) -> tuple[dict[str, str], str, str | None]:
+        environment = {
+            "HOME": "/tmp",
+            "LANG": "C.UTF-8",
+            "LC_ALL": "C.UTF-8",
+            "PATH": "/usr/local/bin:/usr/bin:/bin:/app/node_modules/.bin",
+        }
+        gateway_values = {
+            "url": os.getenv("DEVSEMBLY_MODEL_GATEWAY_URL", ""),
+            "network": os.getenv("DEVSEMBLY_SANDBOX_NETWORK", ""),
+            "secret": os.getenv("DEVSEMBLY_MODEL_GATEWAY_SECRET", ""),
+        }
+        configured = [bool(value) for value in gateway_values.values()]
+        if any(configured) and not all(configured):
+            raise RuntimeError("Model gateway configuration is incomplete")
+        if all(configured):
+            environment.update(
+                {
+                    "ANTHROPIC_BASE_URL": gateway_values["url"],
+                    "ANTHROPIC_AUTH_TOKEN": ModelGatewayTokenCodec(gateway_values["secret"]).issue(
+                        str(task.run_id)
+                    ),
+                }
+            )
+            return environment, "model-gateway-only", gateway_values["network"]
+        return environment, "deny-all", None
 
     async def _execute(
         self,
         payload: dict[str, object],
         workspace: Path,
-        allowed_paths: list[str],
+        task: TaskPacket,
     ) -> BuildResult:
         if not self.command:
             raise RuntimeError("DEVSEMBLY_CODING_PROVIDER_COMMAND is not configured")
-        process = await asyncio.create_subprocess_shell(
-            self.command,
-            cwd=workspace,
-            env=self._provider_environment(),
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        arguments = shlex.split(self.command)
+        if not arguments:
+            raise RuntimeError("DEVSEMBLY_CODING_PROVIDER_COMMAND must be an argument vector")
+        if self.heartbeat is not None:
+            self.heartbeat(f"coding-provider:{payload.get('action', 'unknown')}")
+        environment, network_policy, network_name = self._provider_environment(task)
+        result = await self.sandbox.execute(
+            SandboxRequest(
+                command=arguments,
+                workspace=workspace,
+                stdin=json.dumps(payload).encode(),
+                environment=environment,
+                limits=SandboxLimits(timeout_seconds=self.timeout_seconds),
+                purpose="coding",
+                network_policy=network_policy,
+                network_name=network_name,
+            )
         )
-        stdout, stderr = await process.communicate(json.dumps(payload).encode())
-        if process.returncode != 0:
-            raise RuntimeError(f"Coding provider failed: {stderr.decode(errors='replace')[-4000:]}")
+        if result.metadata.exit_code != 0:
+            raise SandboxError(
+                "Coding provider failed inside sandbox: "
+                f"{result.stderr.decode(errors='replace')[-4000:]}",
+                result.metadata,
+            )
         paths = await changed_paths(workspace)
-        enforce_allowed_paths(paths, allowed_paths)
-        summary = stdout.decode(errors="replace").strip()[-4000:] or "Provider completed."
-        return BuildResult(summary=summary, changed_paths=paths)
+        enforce_allowed_paths(paths, task.allowed_paths)
+        summary = result.stdout.decode(errors="replace").strip()[-4000:] or "Provider completed."
+        return BuildResult(summary=summary, changed_paths=paths, sandbox_execution=result.metadata)
 
     async def build(self, task: TaskPacket, workspace: Path) -> BuildResult:
         return await self._execute(
@@ -71,7 +115,7 @@ class CommandCodingProvider:
                 "validation_commands": task.validation_commands,
             },
             workspace,
-            task.allowed_paths,
+            task,
         )
 
     async def repair(
@@ -92,5 +136,5 @@ class CommandCodingProvider:
                 "evidence": [item.model_dump(mode="json") for item in evidence],
             },
             workspace,
-            task.allowed_paths,
+            task,
         )

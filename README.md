@@ -11,7 +11,7 @@ The first flagship application is being developed with Devsembly, but the platfo
 - Human ownership of product direction and high-risk approvals
 - Specialized agents with narrowly scoped responsibilities
 - No agent approves its own work
-- A source-control provider is the authoritative system of record
+- A source-control provider is authoritative for repository and delivery evidence
 - Every change starts with a traceable work item
 - Every change is built in an isolated branch or workspace
 - Independent validation verifies all agent claims
@@ -73,17 +73,19 @@ Idea
 
 ## Repository status
 
-This repository currently contains the product foundation, workflow specifications, agent role contracts, infrastructure blueprint, security model, and initial CI scaffolding. Application services will be added incrementally through reviewed pull requests.
+This repository contains the product foundation, Genesis Library, workflow specifications, agent role contracts, infrastructure blueprint, security model, initial CI scaffolding, and the first runnable Genesis control-plane scaffold. Application capabilities will continue to be added incrementally through reviewed pull requests.
 
 ## Getting started
 
-1. Review the supported-host requirements in [`docs/platform-support.md`](docs/platform-support.md).
-2. Review the capability and provider model in [`docs/architecture/capability-provider-model.md`](docs/architecture/capability-provider-model.md).
-3. Read [`docs/vision/product-vision.md`](docs/vision/product-vision.md).
-4. Review [`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md).
-5. Review [`docs/security/trust-model.md`](docs/security/trust-model.md).
-6. Start with the roadmap in [`docs/vision/roadmap.md`](docs/vision/roadmap.md).
-7. Use the issue templates to propose work.
+1. Read the canonical [`Genesis Library`](docs/genesis/README.md).
+2. Review the supported-host requirements in [`docs/platform-support.md`](docs/platform-support.md).
+3. Review the capability and provider model in [`docs/architecture/capability-provider-model.md`](docs/architecture/capability-provider-model.md).
+4. Read [`docs/vision/product-vision.md`](docs/vision/product-vision.md).
+5. Review [`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md).
+6. Review [`docs/security/trust-model.md`](docs/security/trust-model.md).
+7. Read the Genesis contract in [`docs/implementation/genesis-reference-implementation-plan.md`](docs/implementation/genesis-reference-implementation-plan.md).
+8. Start the runnable local stack with [`docs/implementation/genesis-local-development.md`](docs/implementation/genesis-local-development.md).
+9. Use the issue templates to propose work.
 
 ## License
 

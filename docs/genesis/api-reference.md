@@ -1,0 +1,95 @@
+# Genesis Registry API v1
+
+**Status:** Current
+**Version:** 1.0.0
+**Implementation issue:** [#21](https://github.com/thebakermark/Devsembly/issues/21)
+
+This API is the first executable Organizational Genome slice. It provides versioned
+create, retrieve, list, and update operations for organizations, initiatives, projects,
+and project budgets. The generated OpenAPI document remains the machine-readable
+contract.
+
+## Resource hierarchy
+
+Every child operation resolves the complete parent path:
+
+```text
+Organization
+└── Initiative
+    └── Project
+        └── Budget
+```
+
+A child identifier presented under the wrong organization, initiative, or project
+returns `404`. This prevents a caller from using a valid identifier to cross an
+organization boundary.
+
+## Operations
+
+The base path is `/api/v1`.
+
+| Resource | Create and list | Retrieve and update |
+|---|---|---|
+| Organization | `POST/GET /organizations` | `GET/PUT /organizations/{organization_id}` |
+| Initiative | `POST/GET /organizations/{organization_id}/initiatives` | `GET/PUT /organizations/{organization_id}/initiatives/{initiative_id}` |
+| Project | `POST/GET /organizations/{organization_id}/initiatives/{initiative_id}/projects` | `GET/PUT /organizations/{organization_id}/initiatives/{initiative_id}/projects/{project_id}` |
+| Budget | `POST/GET .../projects/{project_id}/budgets` | `GET/PUT .../projects/{project_id}/budgets/{budget_id}` |
+
+Creates return `201`. Reads and updates return `200`. Validation failures return `422`.
+Missing or incorrectly scoped resources return `404`. Duplicate resources and stale
+updates return `409`.
+
+## Update and concurrency contract
+
+Updates are full `PUT` operations and require `expected_version`. A successful update
+increments `version`. If another transaction has already changed the resource, the API
+returns:
+
+```json
+{
+  "code": "stale_version",
+  "detail": "budget changed after version 1; reload it and retry",
+  "resource": "budget",
+  "expected_version": 1
+}
+```
+
+Clients MUST reload the current representation before retrying. The API does not silently
+overwrite concurrent changes.
+
+## Budget contract
+
+- `monthly_limit` MUST be positive and use fixed-precision decimal input.
+- `currency` defaults to `USD` and is normalized to an uppercase three-letter code.
+- `enforcement_mode` is `observe`, `warn`, or `block`; the default is `warn`.
+- Genesis v0.1 permits one budget per project.
+- `$50/month` is the reference operating posture, not an automatic limit on every
+  project.
+
+## Transaction and event contract
+
+Application services depend on repository and Unit of Work protocols. SQLAlchemy
+adapters map ORM records to explicit domain data objects. Each successful write and its
+outbox event commit in one PostgreSQL transaction. Leaving a Unit of Work without an
+explicit commit rolls both back.
+
+Create and update operations emit `genesis.<resource>.created` or
+`genesis.<resource>.updated`. The publisher uses leases, bounded retry backoff, atomic
+acknowledgement, and event-ID deduplication to place committed events in the durable
+PostgreSQL event feed. Downstream consumers remain responsible for idempotent processing.
+
+Project-scoped workflow execution intent uses the separate
+[Workflow Run API v1](workflow-run-api.md). It reuses these transaction and isolation
+contracts before any Temporal dispatch can occur.
+
+Project budgets feed the separate
+[Cost Governance API v1](cost-governance-api.md), which snapshots budget versions,
+evaluates supplied cost options, recommends compliant lower-cost alternatives, and
+preserves final decision records.
+
+## Current security boundary
+
+Parent-path validation and repository scoping enforce object isolation. Authentication,
+organization membership, role evaluation, and delegated authority are defined in the
+[Identity and Authorization API](identity-authorization-api.md). Protected APIs MUST use
+this boundary before exposure as a production multi-tenant service.
