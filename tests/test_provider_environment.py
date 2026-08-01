@@ -28,6 +28,12 @@ def _task() -> TaskPacket:
 
 
 def test_provider_environment_excludes_source_control_token(monkeypatch) -> None:
+    for name in (
+        "DEVSEMBLY_MODEL_GATEWAY_URL",
+        "DEVSEMBLY_SANDBOX_NETWORK",
+        "DEVSEMBLY_MODEL_GATEWAY_SECRET",
+    ):
+        monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-secret")
     monkeypatch.setenv("DEVSEMBLY_SOURCE_CONTROL_TOKEN", "source-control-secret")
     monkeypatch.setenv("UNRELATED_SECRET", "unrelated-secret")
@@ -59,6 +65,8 @@ def test_provider_uses_only_short_lived_gateway_access(monkeypatch) -> None:
 
 
 def test_partial_gateway_configuration_fails_closed(monkeypatch) -> None:
+    monkeypatch.delenv("DEVSEMBLY_SANDBOX_NETWORK", raising=False)
+    monkeypatch.delenv("DEVSEMBLY_MODEL_GATEWAY_SECRET", raising=False)
     monkeypatch.setenv("DEVSEMBLY_MODEL_GATEWAY_URL", "http://model-gateway:8080")
 
     with pytest.raises(RuntimeError, match="incomplete"):
