@@ -198,11 +198,11 @@ def _docker_image_available(image: str) -> bool:
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    not _docker_image_available("python:3.12-slim"),
-    reason="Docker runtime or local python:3.12-slim image unavailable",
+    not _docker_image_available("devsembly-sandbox:latest"),
+    reason="Docker runtime or local devsembly-sandbox:latest image unavailable",
 )
 async def test_docker_integration_enforces_identity_network_and_cleanup(tmp_path: Path) -> None:
-    runner = DockerExecutionSandbox(image="python:3.12-slim")
+    runner = DockerExecutionSandbox(image="devsembly-sandbox:latest")
     request = SandboxRequest(
         command=[
             "python",
