@@ -376,25 +376,25 @@
     "status": "partial",
     "results": [
       {
-        "id": "validation:issue-33-controlled-model-egress-local",
-        "title": "Controlled model-egress gateway local gates",
-        "status": "unverified",
+        "id": "validation:issue-33-controlled-model-egress",
+        "title": "Controlled model-egress gateway gates",
+        "status": "passed",
         "kind": "security-validation-suite",
-        "evidence_ids": [],
+        "evidence_ids": ["evidence:ci-86"],
         "acceptance_criterion_ids": ["criterion:issue-33-secure-execution-boundary"],
         "affected_capability_ids": ["capability:project-intelligence"],
         "provenance": {
-          "provider": "repository",
-          "kind": "local-validation",
-          "external_id": "issue-33-controlled-model-egress",
-          "uri": null,
-          "occurred_at": "2026-08-01T17:47:49Z",
-          "observed_at": "2026-08-01T17:47:49Z"
+          "provider": "github",
+          "kind": "github-actions-run",
+          "external_id": "30711501140",
+          "uri": "https://github.com/thebakermark/Devsembly/actions/runs/30711501140",
+          "occurred_at": "2026-08-01T18:04:53Z",
+          "observed_at": "2026-08-01T18:04:53Z"
         },
         "confidence": {
-          "score": 0.8,
-          "status": "inferred",
-          "explanation": "Local repository validation passed with 83 tests and 23 runtime-dependent skips, including task-token, fixed-destination gateway, request/output bounds, model allowlist, credential isolation, and Docker-internal network policy tests. Docker, Compose, PostgreSQL, and live-stack validation await CI."
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Local repository validation passed with 83 tests and 23 runtime-dependent skips. Control Plane CI #86 then passed canonical-state validation, Ruff, formatting, strict MyPy, Markdown, 105 tests with PostgreSQL, migration round trip and model parity, model-egress Compose configuration, Docker image builds, live-stack health, internal-network inspection, gateway control-plane isolation, shell syntax, and cleanup."
         }
       },
       {
@@ -597,7 +597,7 @@
       "owner_id": "service:devsembly-governance",
       "likelihood": 0.2,
       "impact": 0.8,
-      "mitigation": "The optional gateway now fixes the HTTPS provider destination, operations, and model allowlist; retains the provider key outside the task; and issues five-minute task tokens over a verified Docker-internal network. Keep the feature disabled until CI and controlled-host commissioning pass.",
+      "mitigation": "The optional gateway fixes the HTTPS provider destination, operations, and model allowlist; retains the provider key outside the task; and issues five-minute task tokens over a verified Docker-internal network. CI #86 passed the full topology and health gate. Keep the feature disabled until controlled-host commissioning passes.",
       "trigger": "Attempting the external-provider fixture before controlled-host commissioning or substituting unrestricted bridge networking.",
       "affected_capability_ids": ["capability:project-intelligence"],
       "affected_dependency_ids": [],
@@ -607,12 +607,12 @@
         "external_id": "devsembly/model_gateway.py",
         "uri": null,
         "occurred_at": "2026-08-01T17:47:49Z",
-        "observed_at": "2026-08-01T17:47:49Z"
+        "observed_at": "2026-08-01T18:04:53Z"
       },
       "confidence": {
         "score": 1.0,
         "status": "verified",
-        "explanation": "ADR-0018 and focused local tests implement the narrow gateway boundary. Full Docker topology and live provider behavior still require CI and controlled-host evidence."
+        "explanation": "ADR-0018, focused tests, and Control Plane CI #86 verify the narrow gateway boundary and Docker topology. Live provider behavior still requires controlled-host evidence."
       }
     },
     {
@@ -730,12 +730,12 @@
         "external_id": "33",
         "uri": "https://github.com/thebakermark/Devsembly/issues/33",
         "occurred_at": "2026-07-31T23:42:55Z",
-        "observed_at": "2026-08-01T17:47:49Z"
+        "observed_at": "2026-08-01T18:04:53Z"
       },
       "confidence": {
         "score": 1.0,
         "status": "inferred",
-        "explanation": "The fail-closed Docker boundary and narrow model gateway are implemented locally. CI must validate the Compose topology, then the controlled development host can run the disposable credentialed fixture with approved temporary access."
+        "explanation": "The fail-closed Docker boundary and narrow model gateway passed Control Plane CI #86, including Compose topology and live-stack health. The controlled development host can now be commissioned before running the disposable credentialed fixture with approved temporary access."
       }
     }
   ],
