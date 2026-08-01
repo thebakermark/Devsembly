@@ -21,7 +21,7 @@ fi
 command -v ssh >/dev/null 2>&1 || { printf 'ssh is required\n' >&2; exit 1; }
 
 VM_HOST=$1
-VM_USER=${2:-dev}
+VM_USER=${2:-mark}
 [[ "$VM_HOST" =~ ^[A-Za-z0-9._:-]+$ ]] || { printf 'Invalid VM host\n' >&2; exit 2; }
 [[ "$VM_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || { printf 'Invalid SSH user\n' >&2; exit 2; }
 
