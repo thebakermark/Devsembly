@@ -33,8 +33,8 @@ The worker removes labelled orphan containers during startup. Genesis v0.1 opera
 queue; coordinated orphan ownership is required before multiple workers share one Docker daemon.
 
 Validation is credential-free. The first coding slice is also credential-free and deny-all network.
-External model-provider access remains disabled until a controlled outer gateway can issue narrowly
-scoped, short-lived task access and enforce destination policy.
+External model-provider access remains disabled by default. ADR-0018 defines the optional controlled
+outer gateway that issues narrowly scoped, short-lived task access and enforces destination policy.
 
 Source-control operations remain outside the sandbox behind the source-control provider. The Docker
 socket is never mounted into a task container.
@@ -44,8 +44,8 @@ socket is never mounted into a task container.
 - Sandbox startup failure becomes a safe, auditable terminal run instead of host execution.
 - Shell metacharacters remain literal because commands cross the boundary as argument vectors.
 - A container or microVM implementation can replace Docker without changing factory orchestration.
-- The credentialed development-host fixture remains blocked until the Docker integration test runs on
-  the controlled host and controlled model egress is available.
+- The credentialed development-host fixture remains blocked until the Docker integration and model-
+  gateway security tests run on the controlled host with approved disposable access.
 - The v0.1 workspace storage limit combines Docker file-size enforcement with active aggregate-size
   monitoring. Filesystem quota-backed workspaces remain a future hardening option.
 

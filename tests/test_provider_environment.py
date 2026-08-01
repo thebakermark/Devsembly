@@ -12,16 +12,57 @@ from devsembly.provider_command import CommandCodingProvider
 from devsembly.sandbox import SandboxRequest, SandboxResult
 
 
+def _task() -> TaskPacket:
+    return TaskPacket(
+        run_id=uuid.uuid4(),
+        title="Fixture",
+        objective="Exercise the sandbox provider boundary.",
+        repository_url="https://github.com/example/fixture",
+        base_branch="main",
+        branch_name="factory/fixture",
+        allowed_paths=["src"],
+        acceptance_criteria=["Sandbox used"],
+        validation_commands=["pytest -q"],
+        max_repair_attempts=0,
+    )
+
+
 def test_provider_environment_excludes_source_control_token(monkeypatch) -> None:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-secret")
     monkeypatch.setenv("DEVSEMBLY_SOURCE_CONTROL_TOKEN", "source-control-secret")
     monkeypatch.setenv("UNRELATED_SECRET", "unrelated-secret")
 
-    environment = CommandCodingProvider._provider_environment()
+    environment, policy, network = CommandCodingProvider._provider_environment(_task())
 
     assert "ANTHROPIC_API_KEY" not in environment
     assert "DEVSEMBLY_SOURCE_CONTROL_TOKEN" not in environment
     assert "UNRELATED_SECRET" not in environment
+    assert policy == "deny-all"
+    assert network is None
+
+
+def test_provider_uses_only_short_lived_gateway_access(monkeypatch) -> None:
+    secret = "gateway-signing-secret-that-is-at-least-32-bytes"
+    monkeypatch.setenv("DEVSEMBLY_MODEL_GATEWAY_URL", "http://model-gateway:8080")
+    monkeypatch.setenv("DEVSEMBLY_SANDBOX_NETWORK", "devsembly-sandbox-egress")
+    monkeypatch.setenv("DEVSEMBLY_MODEL_GATEWAY_SECRET", secret)
+    monkeypatch.setenv("DEVSEMBLY_MODEL_PROVIDER_API_KEY", "real-provider-key")
+
+    task = _task()
+    environment, policy, network = CommandCodingProvider._provider_environment(task)
+
+    assert environment["ANTHROPIC_BASE_URL"] == "http://model-gateway:8080"
+    assert environment["ANTHROPIC_AUTH_TOKEN"] != secret
+    assert "DEVSEMBLY_MODEL_PROVIDER_API_KEY" not in environment
+    assert policy == "model-gateway-only"
+    assert network == "devsembly-sandbox-egress"
+
+
+def test_partial_gateway_configuration_fails_closed(monkeypatch) -> None:
+    monkeypatch.setenv("DEVSEMBLY_MODEL_GATEWAY_URL", "http://model-gateway:8080")
+
+    with pytest.raises(RuntimeError, match="incomplete"):
+        CommandCodingProvider._provider_environment(_task())
 
 
 @pytest.mark.asyncio
@@ -60,18 +101,7 @@ async def test_provider_cannot_request_host_execution(
         return ["src/result.py"]
 
     monkeypatch.setattr(provider_module, "changed_paths", paths)
-    task = TaskPacket(
-        run_id=uuid.uuid4(),
-        title="Fixture",
-        objective="Exercise the sandbox provider boundary.",
-        repository_url="https://github.com/example/fixture",
-        base_branch="main",
-        branch_name="factory/fixture",
-        allowed_paths=["src"],
-        acceptance_criteria=["Sandbox used"],
-        validation_commands=["pytest -q"],
-        max_repair_attempts=0,
-    )
+    task = _task()
     provider = CommandCodingProvider("provider --literal '; touch escaped'", sandbox=Sandbox())
 
     result = await provider.build(task, tmp_path)

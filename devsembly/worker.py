@@ -45,6 +45,7 @@ async def main() -> None:
             record_run_memory,
             reconcile_github_page,
         ],
+        max_concurrent_activities=1,
     )
     await worker.run()
 

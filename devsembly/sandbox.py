@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import re
 import stat
 import uuid
 from dataclasses import dataclass, field
@@ -41,6 +42,8 @@ class SandboxRequest:
     environment: dict[str, str] = field(default_factory=dict)
     limits: SandboxLimits = field(default_factory=SandboxLimits)
     purpose: str = "validation"
+    network_policy: str = "deny-all"
+    network_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -59,6 +62,7 @@ _SENSITIVE_ENV_FRAGMENTS = (
     "SECRET",
     "PASSWORD",
     "CREDENTIAL",
+    "API_KEY",
     "DATABASE_URL",
     "AWS_",
     "AZURE_",
@@ -66,6 +70,10 @@ _SENSITIVE_ENV_FRAGMENTS = (
     "GITHUB_",
     "OIDC",
 )
+
+_MODEL_GATEWAY_ENVIRONMENT = {"ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"}
+_BASE_SANDBOX_ENVIRONMENT = {"HOME", "LANG", "LC_ALL", "PATH"}
+_DOCKER_NETWORK_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 
 
 def _validate_workspace(workspace: Path) -> Path:
@@ -93,14 +101,33 @@ def _workspace_size(root: Path) -> int:
     )
 
 
-def _validate_environment(environment: dict[str, str]) -> None:
+def _validate_environment(request: SandboxRequest) -> None:
     rejected = [
         name
-        for name in environment
+        for name in request.environment
         if any(fragment in name.upper() for fragment in _SENSITIVE_ENV_FRAGMENTS)
+        and not (
+            request.purpose == "coding"
+            and request.network_policy == "model-gateway-only"
+            and name == "ANTHROPIC_AUTH_TOKEN"
+        )
     ]
     if rejected:
         raise ValueError(f"Sandbox environment contains forbidden secret names: {sorted(rejected)}")
+    if request.network_policy == "deny-all":
+        if request.network_name is not None:
+            raise ValueError("Deny-all sandbox requests cannot select a Docker network")
+        return
+    if request.network_policy != "model-gateway-only" or request.purpose != "coding":
+        raise ValueError("Only coding requests may use the model-gateway-only network policy")
+    if request.network_name is None or not _DOCKER_NETWORK_PATTERN.fullmatch(request.network_name):
+        raise ValueError("Model-gateway sandbox requests require a valid Docker network name")
+    if set(request.environment) != _MODEL_GATEWAY_ENVIRONMENT | _BASE_SANDBOX_ENVIRONMENT:
+        raise ValueError(
+            "Model-gateway sandbox environment must contain only gateway access values"
+        )
+    if not request.environment["ANTHROPIC_BASE_URL"].startswith("http://model-gateway:"):
+        raise ValueError("Model-gateway base URL must target the isolated model-gateway service")
 
 
 class DockerExecutionSandbox:
@@ -133,7 +160,7 @@ class DockerExecutionSandbox:
             "--label",
             f"devsembly.execution_id={container_name.removeprefix('devsembly-sandbox-')}",
             "--network",
-            "none",
+            request.network_name or "none",
             "--read-only",
             "--cap-drop",
             "ALL",
@@ -216,6 +243,20 @@ class DockerExecutionSandbox:
             return None
         return stdout.decode(errors="replace").strip() if code == 0 else None
 
+    async def _network_is_internal(self, network_name: str) -> bool:
+        try:
+            code, stdout, _ = await self._invoke(
+                self.docker_command,
+                "network",
+                "inspect",
+                "--format",
+                "{{.Internal}}",
+                network_name,
+            )
+        except RuntimeError:
+            return False
+        return code == 0 and stdout.decode(errors="replace").strip().lower() == "true"
+
     async def _start_attached(
         self, container_name: str, request: SandboxRequest, workspace: Path
     ) -> tuple[int, bytes, bytes, str]:
@@ -297,7 +338,7 @@ class DockerExecutionSandbox:
     async def execute(self, request: SandboxRequest) -> SandboxResult:
         if not request.command or not all(request.command):
             raise ValueError("Sandbox command must be a non-empty argument vector")
-        _validate_environment(request.environment)
+        _validate_environment(request)
         workspace = _validate_workspace(request.workspace)
         if _workspace_size(workspace) > request.limits.storage_bytes:
             raise ValueError("Sandbox workspace exceeds its storage limit before execution")
@@ -312,6 +353,7 @@ class DockerExecutionSandbox:
             command=request.command,
             purpose=request.purpose,
             user=f"{self.sandbox_uid}:{self.sandbox_gid}",
+            network_policy=request.network_policy,
             cpu_limit=request.limits.cpus,
             memory_limit_bytes=request.limits.memory_bytes,
             pid_limit=request.limits.pids,
@@ -323,6 +365,14 @@ class DockerExecutionSandbox:
         cleanup_succeeded = False
         created = False
         try:
+            if request.network_name is not None and not await self._network_is_internal(
+                request.network_name
+            ):
+                metadata.termination_reason = "network-policy-unavailable"
+                raise SandboxUnavailableError(
+                    "Sandbox model-gateway network is missing or is not Docker-internal",
+                    metadata,
+                )
             create = self.create_arguments(request, container_name, workspace)
             try:
                 code, _, stderr = await self._invoke(*create)

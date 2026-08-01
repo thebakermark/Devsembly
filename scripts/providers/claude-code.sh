@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-: "${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY is required}"
+: "${ANTHROPIC_BASE_URL:?ANTHROPIC_BASE_URL is required}"
+: "${ANTHROPIC_AUTH_TOKEN:?ANTHROPIC_AUTH_TOKEN is required}"
 
 TASK_JSON="$(cat)"
 MAX_TURNS="${DEVSEMBLY_CLAUDE_MAX_TURNS:-20}"

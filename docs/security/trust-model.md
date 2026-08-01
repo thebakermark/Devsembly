@@ -28,10 +28,17 @@ non-root, read-only-root, capability-free, deny-all-network, and resource bounde
 task workspace as writable and overlays Git metadata read-only. It receives no worker, source-control,
 database, cloud, OIDC, or control-plane credentials and never falls back to host execution.
 
-The first slice intentionally provides no external model-provider egress. The credentialed live proof
-remains blocked until a controlled development host passes the Docker integration tests and an outer
-gateway supplies narrowly scoped, short-lived task model access with explicit destination policy.
-Unrestricted bridge networking is not an acceptable substitute.
+External model-provider egress remains disabled by default. When fully configured, the worker gives a
+coding task only a five-minute, task-bound gateway token and connects it to a verified Docker-internal
+network. The separate gateway holds the provider key, accepts only allowlisted Anthropic operations
+and models, and forwards only to an allowlisted HTTPS origin. It is not connected to the control-plane
+network. Validation never receives gateway access. Unrestricted bridge networking is not an
+acceptable substitute.
+
+Genesis v0.1 limits the worker to one active activity because coding sandboxes share the isolated
+gateway network. Per-task networks are required before multi-worker or concurrent activity execution.
+The live proof remains blocked until this topology is commissioned on the controlled development host
+with approved disposable access.
 
 Every sandbox attempt records the image identifier, argument vector, effective limits, non-root user,
 network policy, timestamps, exit, termination reason, and cleanup result. The worker removes labelled

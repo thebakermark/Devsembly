@@ -69,6 +69,89 @@ async def test_secret_environment_is_rejected_before_runtime_use(tmp_path: Path)
 
 
 @pytest.mark.asyncio
+async def test_provider_api_key_is_rejected_even_for_gateway_policy(tmp_path: Path) -> None:
+    request = SandboxRequest(
+        command=["true"],
+        workspace=tmp_path,
+        purpose="coding",
+        network_policy="model-gateway-only",
+        network_name="devsembly-sandbox-egress",
+        environment={
+            "HOME": "/tmp",
+            "LANG": "C.UTF-8",
+            "LC_ALL": "C.UTF-8",
+            "PATH": "/usr/bin:/bin",
+            "ANTHROPIC_BASE_URL": "http://model-gateway:8080",
+            "ANTHROPIC_AUTH_TOKEN": "task-token",
+            "ANTHROPIC_API_KEY": "provider-secret",
+        },
+    )
+
+    with pytest.raises(ValueError, match="forbidden secret"):
+        await DockerExecutionSandbox().execute(request)
+
+
+def test_gateway_policy_selects_only_the_configured_network(tmp_path: Path) -> None:
+    runner = DockerExecutionSandbox(image="fixture")
+    request = SandboxRequest(
+        command=["true"],
+        workspace=tmp_path,
+        purpose="coding",
+        network_policy="model-gateway-only",
+        network_name="devsembly-sandbox-egress",
+        environment={
+            "HOME": "/tmp",
+            "LANG": "C.UTF-8",
+            "LC_ALL": "C.UTF-8",
+            "PATH": "/usr/bin:/bin",
+            "ANTHROPIC_BASE_URL": "http://model-gateway:8080",
+            "ANTHROPIC_AUTH_TOKEN": "task-token",
+        },
+    )
+
+    arguments = runner.create_arguments(request, "devsembly-sandbox-fixture", tmp_path.resolve())
+
+    assert arguments[arguments.index("--network") + 1] == "devsembly-sandbox-egress"
+
+
+@pytest.mark.asyncio
+async def test_gateway_policy_fails_closed_when_network_is_not_internal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runner = DockerExecutionSandbox(image="fixture")
+
+    async def invoke(*arguments: str, stdin: bytes = b"") -> tuple[int, bytes, bytes]:
+        del stdin
+        if "image" in arguments:
+            return 0, b"sha256:fixture\n", b""
+        if "network" in arguments:
+            return 0, b"false\n", b""
+        return 0, b"", b""
+
+    monkeypatch.setattr(runner, "_invoke", invoke)
+    request = SandboxRequest(
+        command=["true"],
+        workspace=tmp_path,
+        purpose="coding",
+        network_policy="model-gateway-only",
+        network_name="devsembly-sandbox-egress",
+        environment={
+            "HOME": "/tmp",
+            "LANG": "C.UTF-8",
+            "LC_ALL": "C.UTF-8",
+            "PATH": "/usr/bin:/bin",
+            "ANTHROPIC_BASE_URL": "http://model-gateway:8080",
+            "ANTHROPIC_AUTH_TOKEN": "task-token",
+        },
+    )
+
+    with pytest.raises(SandboxUnavailableError, match="not Docker-internal") as raised:
+        await runner.execute(request)
+
+    assert raised.value.metadata.termination_reason == "network-policy-unavailable"
+
+
+@pytest.mark.asyncio
 async def test_symlink_escape_is_rejected_before_runtime_use(tmp_path: Path) -> None:
     (tmp_path / "escape").symlink_to("/etc/passwd")
 

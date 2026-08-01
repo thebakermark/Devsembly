@@ -376,6 +376,28 @@
     "status": "partial",
     "results": [
       {
+        "id": "validation:issue-33-controlled-model-egress-local",
+        "title": "Controlled model-egress gateway local gates",
+        "status": "unverified",
+        "kind": "security-validation-suite",
+        "evidence_ids": [],
+        "acceptance_criterion_ids": ["criterion:issue-33-secure-execution-boundary"],
+        "affected_capability_ids": ["capability:project-intelligence"],
+        "provenance": {
+          "provider": "repository",
+          "kind": "local-validation",
+          "external_id": "issue-33-controlled-model-egress",
+          "uri": null,
+          "occurred_at": "2026-08-01T17:47:49Z",
+          "observed_at": "2026-08-01T17:47:49Z"
+        },
+        "confidence": {
+          "score": 0.8,
+          "status": "inferred",
+          "explanation": "Local repository validation passed with 82 tests and 23 runtime-dependent skips, including task-token, fixed-destination gateway, model allowlist, credential isolation, and Docker-internal network policy tests. Docker, Compose, PostgreSQL, and live-stack validation await CI."
+        }
+      },
+      {
         "id": "validation:issue-33-secure-execution-boundary-local",
         "title": "Secure execution boundary local gates",
         "status": "passed",
@@ -568,29 +590,29 @@
     },
     {
       "id": "risk:controlled-model-egress-unavailable",
-      "title": "External coding-provider access has no controlled egress gateway",
-      "status": "open",
+      "title": "Controlled model egress requires development-host commissioning",
+      "status": "mitigating",
       "kind": "security",
       "severity": "high",
       "owner_id": "service:devsembly-governance",
-      "likelihood": 1.0,
+      "likelihood": 0.2,
       "impact": 0.8,
-      "mitigation": "Keep coding network deny-all and credential-free until an outer gateway provides destination policy and narrowly scoped short-lived task access.",
-      "trigger": "Attempting the external-provider fixture or substituting unrestricted bridge networking.",
+      "mitigation": "The optional gateway now fixes the HTTPS provider destination, operations, and model allowlist; retains the provider key outside the task; and issues five-minute task tokens over a verified Docker-internal network. Keep the feature disabled until CI and controlled-host commissioning pass.",
+      "trigger": "Attempting the external-provider fixture before controlled-host commissioning or substituting unrestricted bridge networking.",
       "affected_capability_ids": ["capability:project-intelligence"],
       "affected_dependency_ids": [],
       "provenance": {
         "provider": "repository",
-        "kind": "accepted-decision",
-        "external_id": "docs/architecture/decisions/0017-ephemeral-docker-execution-boundary.md",
+        "kind": "implementation",
+        "external_id": "devsembly/model_gateway.py",
         "uri": null,
-        "occurred_at": "2026-08-01T16:02:03Z",
-        "observed_at": "2026-08-01T16:02:03Z"
+        "occurred_at": "2026-08-01T17:47:49Z",
+        "observed_at": "2026-08-01T17:47:49Z"
       },
       "confidence": {
         "score": 1.0,
         "status": "verified",
-        "explanation": "ADR-0017 intentionally implements deny-all networking first and forbids long-lived model credentials or unrestricted bridge networking."
+        "explanation": "ADR-0018 and focused local tests implement the narrow gateway boundary. Full Docker topology and live provider behavior still require CI and controlled-host evidence."
       }
     },
     {
@@ -699,7 +721,7 @@
   "recommendations": [
     {
       "id": "recommendation:prove-first-governed-delivery-loop",
-      "title": "Verify the Docker boundary and add controlled model egress before the fixture",
+      "title": "Commission the controlled host and run the disposable fixture",
       "status": "active",
       "kind": "next-work",
       "provenance": {
@@ -708,12 +730,12 @@
         "external_id": "33",
         "uri": "https://github.com/thebakermark/Devsembly/issues/33",
         "occurred_at": "2026-07-31T23:42:55Z",
-        "observed_at": "2026-08-01T16:02:03Z"
+        "observed_at": "2026-08-01T17:47:49Z"
       },
       "confidence": {
         "score": 1.0,
         "status": "inferred",
-        "explanation": "The fail-closed Docker boundary and focused unit coverage are implemented. The controlled development host must run the Docker integration suite, and a policy-controlled outer model gateway must exist before the credentialed fixture run."
+        "explanation": "The fail-closed Docker boundary and narrow model gateway are implemented locally. CI must validate the Compose topology, then the controlled development host can run the disposable credentialed fixture with approved temporary access."
       }
     }
   ],

@@ -48,6 +48,11 @@ jobs:
       MINIO_ROOT_PASSWORD: ci-only-password
       DEVSEMBLY_DATABASE_URL: postgresql+asyncpg://devsembly:ci-only-password@localhost:5432/devsembly
       DEVSEMBLY_TEST_DATABASE_URL: postgresql+asyncpg://devsembly:ci-only-password@localhost:5432/devsembly
+      DEVSEMBLY_MODEL_GATEWAY_URL: http://model-gateway:8080
+      DEVSEMBLY_SANDBOX_NETWORK: devsembly-sandbox-egress
+      DEVSEMBLY_MODEL_GATEWAY_SECRET: ci-only-model-gateway-signing-secret
+      DEVSEMBLY_MODEL_PROVIDER_API_KEY: ci-only-provider-key
+      DEVSEMBLY_MODEL_GATEWAY_ALLOWED_MODELS: claude-sonnet-fixture
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -72,16 +77,19 @@ jobs:
           uv run alembic downgrade base
           uv run alembic upgrade head
           uv run alembic check
-      - run: docker compose config --quiet
+      - run: docker compose --profile model-egress config --quiet
       - name: Build and health-check Docker stack
         run: |
           set -Eeuo pipefail
-          trap 'docker compose logs --no-color' ERR
-          trap 'docker compose down --volumes --remove-orphans' EXIT
+          trap 'docker compose --profile model-egress logs --no-color' ERR
+          trap 'docker compose --profile model-egress down --volumes --remove-orphans' EXIT
           docker build --file Dockerfile.sandbox --tag devsembly-sandbox:latest .
           uv run pytest -q tests/test_sandbox.py
-          docker compose build
-          docker compose up -d --wait --wait-timeout 240
+          docker compose --profile model-egress build
+          docker compose --profile model-egress up -d --wait --wait-timeout 240
+          test "$(docker network inspect devsembly-sandbox-egress --format '{{.Internal}}')" = true
+          gateway_networks="$(docker inspect "$(docker compose --profile model-egress ps -q model-gateway)" --format '{{json .NetworkSettings.Networks}}')"
+          [[ "$gateway_networks" != *control-plane* ]]
           curl --fail --silent --show-error http://127.0.0.1:8000/health/ready
           docker compose ps
       - name: Validate shell syntax
