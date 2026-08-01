@@ -376,6 +376,28 @@
     "status": "partial",
     "results": [
       {
+        "id": "validation:issue-33-commissioning-automation",
+        "title": "Development-host commissioning automation gates",
+        "status": "passed",
+        "kind": "operational-validation-suite",
+        "evidence_ids": ["evidence:ci-88"],
+        "acceptance_criterion_ids": ["criterion:issue-33-secure-execution-boundary"],
+        "affected_capability_ids": ["capability:project-intelligence"],
+        "provenance": {
+          "provider": "github",
+          "kind": "github-actions-run",
+          "external_id": "30723535687",
+          "uri": "https://github.com/thebakermark/Devsembly/actions/runs/30723535687",
+          "occurred_at": "2026-08-01T23:36:25Z",
+          "observed_at": "2026-08-01T23:36:25Z"
+        },
+        "confidence": {
+          "score": 1.0,
+          "status": "verified",
+          "explanation": "Control Plane CI #88 passed canonical-state validation, Ruff, formatting, strict MyPy, Markdown, 107 PostgreSQL-backed tests with one runtime skip, migration round trip and model parity, normal and commissioning Compose configuration, 13 focused Docker sandbox tests, the commissioning-worker image build, full-stack health, shell syntax, and cleanup. The controlled development host and live provider call remain unverified."
+        }
+      },
+      {
         "id": "validation:issue-33-controlled-model-egress",
         "title": "Controlled model-egress gateway gates",
         "status": "passed",
@@ -570,7 +592,7 @@
       "owner_id": "service:devsembly-governance",
       "likelihood": 0.2,
       "impact": 1.0,
-      "mitigation": "The implementation fails closed through an ephemeral non-root, deny-all-network Docker sandbox with bounded resources and no control-plane credentials; CI #82 passed the Docker integration suite. Commission the same boundary on the controlled development host before live use.",
+      "mitigation": "The implementation fails closed through an ephemeral non-root, deny-all-network Docker sandbox with bounded resources and no control-plane credentials; CI #88 passed the commissioning-only trusted-worker image and Compose boundary. Run the automated workflow on the controlled development host before live use.",
       "trigger": "Any credentialed external-provider run before controlled-host sandbox commissioning.",
       "affected_capability_ids": ["capability:project-intelligence"],
       "affected_dependency_ids": [],
@@ -580,12 +602,12 @@
         "external_id": "devsembly/sandbox.py",
         "uri": null,
         "occurred_at": "2026-08-01T00:00:00Z",
-        "observed_at": "2026-08-01T16:26:13Z"
+        "observed_at": "2026-08-01T23:36:25Z"
       },
       "confidence": {
         "score": 1.0,
         "status": "verified",
-        "explanation": "Host fallback has been removed and Control Plane CI #82 passed nine focused Docker sandbox tests. The controlled development host has not yet been commissioned for this runtime."
+        "explanation": "Host fallback has been removed, and Control Plane CI #88 passed the commissioning override, trusted-worker build, and 13 focused Docker sandbox tests. The controlled development host has not yet run this workflow."
       }
     },
     {
@@ -597,7 +619,7 @@
       "owner_id": "service:devsembly-governance",
       "likelihood": 0.2,
       "impact": 0.8,
-      "mitigation": "The optional gateway fixes the HTTPS provider destination, operations, and model allowlist; retains the provider key outside the task; and issues five-minute task tokens over a verified Docker-internal network. CI #86 passed the full topology and health gate. Keep the feature disabled until controlled-host commissioning passes.",
+      "mitigation": "The optional gateway fixes the HTTPS provider destination, operations, and model allowlist; retains the provider key outside the task; and issues five-minute task tokens over a verified Docker-internal network. CI #88 passed the automated commissioning topology. Keep the feature disabled until the controlled-host run passes.",
       "trigger": "Attempting the external-provider fixture before controlled-host commissioning or substituting unrestricted bridge networking.",
       "affected_capability_ids": ["capability:project-intelligence"],
       "affected_dependency_ids": [],
@@ -607,12 +629,12 @@
         "external_id": "devsembly/model_gateway.py",
         "uri": null,
         "occurred_at": "2026-08-01T17:47:49Z",
-        "observed_at": "2026-08-01T18:04:53Z"
+        "observed_at": "2026-08-01T23:36:25Z"
       },
       "confidence": {
         "score": 1.0,
         "status": "verified",
-        "explanation": "ADR-0018, focused tests, and Control Plane CI #86 verify the narrow gateway boundary and Docker topology. Live provider behavior still requires controlled-host evidence."
+        "explanation": "ADR-0018, focused tests, and Control Plane CI #88 verify the narrow gateway and commissioning topology. Live provider behavior still requires controlled-host evidence."
       }
     },
     {
@@ -730,12 +752,12 @@
         "external_id": "33",
         "uri": "https://github.com/thebakermark/Devsembly/issues/33",
         "occurred_at": "2026-07-31T23:42:55Z",
-        "observed_at": "2026-08-01T18:04:53Z"
+        "observed_at": "2026-08-01T23:36:25Z"
       },
       "confidence": {
         "score": 1.0,
         "status": "inferred",
-        "explanation": "The fail-closed Docker boundary and narrow model gateway passed Control Plane CI #86, including Compose topology and live-stack health. The controlled development host can now be commissioned before running the disposable credentialed fixture with approved temporary access."
+        "explanation": "The MacBook-to-development-VM automation passed Control Plane CI #88, including the commissioning-only trusted-worker build and Docker boundary. Run it on the controlled host with approved temporary access to satisfy the remaining live-fixture criterion."
       }
     }
   ],
